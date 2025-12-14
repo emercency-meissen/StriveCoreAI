@@ -98,10 +98,20 @@ let emergency = false;
 const chat = document.getElementById("chat");
 const input = document.getElementById("input");
 
-function addMessage(text, type) {
+function addMessage(content, type, isImage = false) {
   const div = document.createElement("div");
   div.className = "message " + type;
-  div.textContent = text;
+
+  if (isImage) {
+    const img = document.createElement("img");
+    img.src = content;
+    img.style.maxWidth = "100%";
+    img.style.borderRadius = "12px";
+    div.appendChild(img);
+  } else {
+    div.textContent = content;
+  }
+
   chat.appendChild(div);
   chat.scrollTop = chat.scrollHeight;
 }
@@ -161,3 +171,4 @@ window.addEventListener("keydown", e => {
 
 </body>
 </html>
+
