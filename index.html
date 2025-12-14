@@ -137,8 +137,13 @@ async function sendMessage() {
       /* ✅ SONST NICHTS */
     });
 
-    const data = await res.json();
-    addMessage(data.reply, "ai");
+   const data = await res.json();
+
+if (data.image) {
+  addMessage(data.image, "ai", true);
+} else {
+  addMessage(data.reply, "ai");
+}
 
   } catch {
     addMessage("⚠️ Verbindungsfehler zur KI.", "ai");
@@ -171,4 +176,5 @@ window.addEventListener("keydown", e => {
 
 </body>
 </html>
+
 
