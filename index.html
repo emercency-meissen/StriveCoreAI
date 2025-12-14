@@ -128,26 +128,22 @@ function clearChat() {
   chat.innerHTML = '';
 }
 
-// 🧠 OFFLINE-FALLBACK
+// 🧠 LOKALE INTELLIGENZ (MATHE + SPRACHEN)
 function smartReply(text) {
   const tl = text.toLowerCase().trim();
 
-  // MATHE (sehr große Zahlen)
+  // MATHE (beliebig groß)
   const math = tl.match(/^(\d+)\s*([+\-*/])\s*(\d+)$/);
   if (math) {
-    try {
-      const a = BigInt(math[1]);
-      const b = BigInt(math[3]);
-      const op = math[2];
-      let r;
-      if (op === '+') r = a + b;
-      if (op === '-') r = a - b;
-      if (op === '*') r = a * b;
-      if (op === '/') r = b !== 0n ? a / b : 'Division durch 0';
-      return `🧮 ${a} ${op} ${b} = ${r}`;
-    } catch {
-      return '❌ Mathe-Fehler';
-    }
+    const a = BigInt(math[1]);
+    const b = BigInt(math[3]);
+    const op = math[2];
+    let r;
+    if (op === '+') r = a + b;
+    if (op === '-') r = a - b;
+    if (op === '*') r = a * b;
+    if (op === '/') r = b !== 0n ? a / b : 'Division durch 0';
+    return `🧮 ${a} ${op} ${b} = ${r}`;
   }
 
   if (tl.includes('hallo')) return 'Hallo 👋 Wie kann ich dir helfen?';
@@ -155,32 +151,42 @@ function smartReply(text) {
   if (tl.includes('bonjour')) return 'Bonjour 👋 Comment puis-je aider ?';
   if (tl.includes('hola')) return 'Hola 👋 ¿En qué puedo ayudarte?';
 
-  return '🤖 Ich habe dich verstanden.';
+  return null; // wichtig!
 }
 
-// 🌐 ONLINE + FALLBACK
+// 🌐 ONLINE + FALLBACK (SAUBER)
 async function sendMessage() {
   if (emergency) return;
 
   const text = input.value.trim();
-  if (text === '') return;
+  if (!text) return;
 
   addMessage(text, 'user');
   input.value = '';
 
+  // 1️⃣ Erst lokal prüfen (Mathe etc.)
+  const local = smartReply(text);
+  if (local) {
+    addMessage(local, 'ai');
+    return;
+  }
+
+  // 2️⃣ Online KI
   try {
-    const res = await fetch('https://strivecoreai.onrender.com/chat', {
+    const res = await fetch('https://strivecoreai.onrender.com', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ message: text })
     });
 
+    if (!res.ok) throw new Error();
+
     const data = await res.json();
-    addMessage(data.reply || smartReply(text), 'ai');
+    addMessage(data.reply, 'ai');
 
   } catch {
     addMessage('⚠️ Offline-Modus aktiv', 'ai');
-    addMessage(smartReply(text), 'ai');
+    addMessage('🤖 Ich kann gerade nur lokal antworten.', 'ai');
   }
 }
 
@@ -193,13 +199,13 @@ input.addEventListener('keydown', e => {
   }
 });
 
-// EMERGENCY BUTTON
+// EMERGENCY
 emergencyBtn.addEventListener('click', () => {
   emergency = true;
   addMessage('🚨 EMERGENCY STOP', 'ai');
 });
 
-// TASTEN
+// SHORTCUTS
 window.addEventListener('keydown', e => {
   if (e.ctrlKey && e.key.toLowerCase() === 'v') {
     emergency = true;
