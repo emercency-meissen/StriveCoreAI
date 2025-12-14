@@ -8,39 +8,42 @@ app.use(cors());
 app.use(express.json());
 
 /* =========================
-   OPENAI
+   KONFIG
 ========================= */
+
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY
 });
 
-/* =========================
-   SPEICHER (einfach)
-========================= */
-const users = {};           // email -> { passwordHash }
-const conversations = {};   // ip -> messages[]
-const admins = {};          // ip -> true
-const bans = {};            // ip -> timestamp
+const ADMIN_PASSWORD = "5910783";
 
 /* =========================
-   HILFSFUNKTIONEN
+   SPEICHER (IN-MEMORY)
 ========================= */
-function getIP(req) {
-  return req.headers["x-forwarded-for"]?.split(",")[0] || req.socket.remoteAddress;
-}
+
+const users = {};            // email -> { passwordHash }
+const conversations = {};    // ip -> messages[]
+const bannedIPs = {};        // ip -> banUntilTimestamp
+const adminIPs = new Set();  // eingeloggte Admin-IP
+
+let serverStatus = "online"; // online | offline
+
+/* =========================
+   HELFER
+========================= */
 
 function isBanned(ip) {
-  if (!bans[ip]) return false;
-  return Date.now() - bans[ip] < 24 * 60 * 60 * 1000;
+  if (!bannedIPs[ip]) return false;
+  if (Date.now() > bannedIPs[ip]) {
+    delete bannedIPs[ip];
+    return false;
+  }
+  return true;
 }
 
-function getConversation(ip) {
-  if (!conversations[ip]) conversations[ip] = [];
-  return conversations[ip];
-}
-
-function isAdmin(ip) {
-  return admins[ip] === true;
+function getConversation(id) {
+  if (!conversations[id]) conversations[id] = [];
+  return conversations[id];
 }
 
 /* =========================
@@ -52,18 +55,19 @@ app.get("/", (req, res) => {
 });
 
 /* -------- REGISTER -------- */
+
 app.post("/register", async (req, res) => {
   const { email, password } = req.body;
-  const ip = getIP(req);
+  const ip = req.ip;
 
   if (!email || !password) {
     return res.status(400).json({ error: "Fehlende Daten" });
   }
 
   if (users[email]) {
-    bans[ip] = Date.now();
+    bannedIPs[ip] = Date.now() + 24 * 60 * 60 * 1000;
     return res.status(403).json({
-      error: "Email existiert bereits. Gerät 24h gesperrt."
+      error: "Account existiert bereits. 24h IP-Ban."
     });
   }
 
@@ -74,6 +78,7 @@ app.post("/register", async (req, res) => {
 });
 
 /* -------- LOGIN -------- */
+
 app.post("/login", async (req, res) => {
   const { email, password } = req.body;
   const user = users[email];
@@ -91,39 +96,86 @@ app.post("/login", async (req, res) => {
 });
 
 /* -------- CHAT -------- */
+
 app.post("/chat", async (req, res) => {
-  const ip = getIP(req);
+  const ip = req.ip;
   const { message } = req.body;
 
   if (isBanned(ip)) {
-    return res.json({ reply: "🚫 Dein Gerät ist 24h gesperrt." });
+    return res.json({
+      reply: "🚫 Dein Gerät ist temporär gesperrt."
+    });
+  }
+
+  /* SERVER OFFLINE */
+  if (serverStatus === "offline") {
+    return res.json({
+      reply: "🚧 STRIVECORE AI HAT AKTUELL SERVER PROBLEME !"
+    });
   }
 
   if (!message) {
-    return res.json({ reply: "Tut mir leid, ich habe nichts verstanden." });
+    return res.json({
+      reply: "Tut mir leid, ich habe nichts verstanden."
+    });
   }
 
-  /* ===== ADMIN LOGIN PER CHAT ===== */
+  /* =========================
+     ADMIN COMMANDS (CHAT)
+  ========================= */
+
+  // ADMIN LOGIN
   if (message.startsWith("/admin login")) {
-    const pw = message.split(" ")[2];
+    const pass = message.split(" ")[2];
+    if (pass === ADMIN_PASSWORD) {
+      adminIPs.add(ip);
+      return res.json({
+        reply: "🛡️ Admin-Modus aktiviert."
+      });
+    }
+    return res.json({ reply: "❌ Falsches Admin-Passwort." });
+  }
 
-    if (!pw) {
-      return res.json({ reply: "❌ Passwort fehlt." });
+  if (adminIPs.has(ip)) {
+
+    // SERVER STATUS
+    if (message.startsWith("/admin server")) {
+      const mode = message.split(" ")[2];
+      if (mode === "online") {
+        serverStatus = "online";
+        return res.json({ reply: "🟢 Server ist ONLINE." });
+      }
+      if (mode === "offline") {
+        serverStatus = "offline";
+        return res.json({ reply: "🔴 Server ist OFFLINE." });
+      }
+      return res.json({
+        reply: "⚙️ Nutzung: /admin server online | offline"
+      });
     }
 
-    if (pw === process.env.ADMIN_PASSWORD) {
-      admins[ip] = true;
-      return res.json({ reply: "✅ Admin-Modus aktiviert." });
-    } else {
-      return res.json({ reply: "❌ Falsches Admin-Passwort." });
+    // IP BAN
+    if (message.startsWith("/admin ban")) {
+      const parts = message.split(" ");
+      const targetIP = parts[2];
+      const hours = parseInt(parts[3]);
+
+      if (!targetIP || !hours) {
+        return res.json({
+          reply: "⚠️ Nutzung: /admin ban <IP> <Stunden>"
+        });
+      }
+
+      bannedIPs[targetIP] = Date.now() + hours * 60 * 60 * 1000;
+      return res.json({
+        reply: `⛔ IP ${targetIP} für ${hours} Stunden gebannt.`
+      });
     }
   }
 
-  /* ===== ADMIN BEFEHLE ===== */
-  if (message === "/admin clear" && isAdmin(ip)) {
-    conversations[ip] = [];
-    return res.json({ reply: "🧹 Chat gelöscht (Admin)." });
-  }
+  /* =========================
+     KI CHAT
+  ========================= */
 
   const conversation = getConversation(ip);
   conversation.push({ role: "user", content: message });
@@ -141,8 +193,8 @@ Du bist StriveCore AI.
 - Antworte wie ChatGPT
 - Verstehe Rechtschreibfehler
 - Antworte in der Sprache des Nutzers
-- Sei intelligent, logisch und hilfreich
-- Wenn du etwas nicht weißt, sage ehrlich:
+- Sei logisch, hilfreich und freundlich
+- Wenn du etwas nicht weißt, sage:
   "Tut mir leid, das weiß ich leider nicht."
 `
         },
@@ -163,10 +215,37 @@ Du bist StriveCore AI.
   }
 });
 
+/* -------- IMAGE GENERATION -------- */
+
+app.post("/image", async (req, res) => {
+  const { prompt } = req.body;
+
+  if (!prompt) {
+    return res.status(400).json({ error: "Kein Prompt angegeben" });
+  }
+
+  try {
+    const image = await openai.images.generate({
+      model: "gpt-image-1",
+      prompt,
+      size: "1024x1024"
+    });
+
+    res.json({ image: image.data[0].url });
+
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({
+      error: "Bild konnte nicht erstellt werden"
+    });
+  }
+});
+
 /* =========================
-   SERVER START
+   START
 ========================= */
+
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
-  console.log("StriveCore AI läuft auf Port", PORT);
+  console.log("🚀 StriveCore AI läuft auf Port", PORT);
 });
