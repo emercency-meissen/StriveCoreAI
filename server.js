@@ -25,10 +25,6 @@ const users = {};
 const conversations = {};
 const bannedIPs = {};
 const adminIPs = new Set();
-const onlineIPs = new Set();
-
-const logs = [];
-const warnings = [];
 
 let serverStatus = "online"; // online | offline
 
@@ -45,42 +41,9 @@ function isBanned(ip) {
   return true;
 }
 
-function getConversation(ip) {
-  if (!conversations[ip]) conversations[ip] = [];
-  return conversations[ip];
-}
-
-function log(text) {
-  logs.push(`[${new Date().toISOString()}] ${text}`);
-}
-
-const warningKeywords = [
-  "bank ausrauben",
-  "umbringen",
-  "töten",
-  "anschlag",
-  "bombe",
-  "suizid",
-  "mich umbringen"
-];
-
-function checkWarnings(ip, text) {
-  const lower = text.toLowerCase();
-  if (warningKeywords.some(w => lower.includes(w))) {
-    warnings.push({
-      ip,
-      text,
-      time: new Date().toISOString()
-    });
-    log(`⚠️ WARNING von ${ip}: ${text}`);
-  }
-}
-
-function requireAdmin(req, res, next) {
-  if (!adminIPs.has(req.ip)) {
-    return res.status(403).json({ error: "Kein Admin-Zugriff" });
-  }
-  next();
+function getConversation(id) {
+  if (!conversations[id]) conversations[id] = [];
+  return conversations[id];
 }
 
 /* =========================
@@ -103,13 +66,13 @@ app.post("/register", async (req, res) => {
 
   if (users[email]) {
     bannedIPs[ip] = Date.now() + 24 * 60 * 60 * 1000;
-    log(`⛔ Auto-Ban ${ip} (Account existiert)`);
-    return res.status(403).json({ error: "Account existiert" });
+    return res.status(403).json({
+      error: "Account existiert bereits. 24h IP-Ban."
+    });
   }
 
-  users[email] = {
-    passwordHash: await bcrypt.hash(password, 10)
-  };
+  const hash = await bcrypt.hash(password, 10);
+  users[email] = { passwordHash: hash };
 
   res.json({ success: true });
 });
@@ -134,43 +97,84 @@ app.post("/chat", async (req, res) => {
   const ip = req.ip;
   const { message } = req.body;
 
-  onlineIPs.add(ip);
-
   if (!message) {
-    return res.json({ reply: "Ich habe nichts verstanden." });
+    return res.json({ reply: "Tut mir leid, ich habe nichts verstanden." });
   }
 
-  /* ===== ADMIN LOGIN (IMMER ERLAUBT) ===== */
+  /* =========================
+     ADMIN LOGIN – IMMER ERLAUBT
+  ========================= */
 
   if (message.startsWith("/admin login")) {
     const pass = message.split(" ")[2];
     if (pass === ADMIN_PASSWORD) {
       adminIPs.add(ip);
-      log(`🛡️ Admin Login: ${ip}`);
-      return res.json({ reply: "🛡️ STRIVECORE AI ADMIN MODUS AKTIV" });
+      return res.json({ reply: "🛡️ Admin-Modus aktiviert." });
     }
     return res.json({ reply: "❌ Falsches Admin-Passwort." });
   }
 
-  /* ===== BANNED ===== */
+  /* =========================
+     ADMIN BEFEHLE – IMMER ERLAUBT
+  ========================= */
 
-  if (isBanned(ip)) {
-    return res.json({ reply: "🚫 Dein Gerät ist gesperrt." });
+  if (adminIPs.has(ip)) {
+
+    if (message.startsWith("/admin server")) {
+      const mode = message.split(" ")[2];
+
+      if (mode === "online") {
+        serverStatus = "online";
+        return res.json({ reply: "🟢 Server ist ONLINE." });
+      }
+
+      if (mode === "offline") {
+        serverStatus = "offline";
+        return res.json({ reply: "🔴 Server ist OFFLINE." });
+      }
+
+      return res.json({
+        reply: "⚙️ Nutzung: /admin server online | offline"
+      });
+    }
+
+    if (message.startsWith("/admin ban")) {
+      const parts = message.split(" ");
+      const targetIP = parts[2];
+      const hours = parseInt(parts[3]);
+
+      if (!targetIP || !hours) {
+        return res.json({
+          reply: "⚠️ Nutzung: /admin ban <IP> <Stunden>"
+        });
+      }
+
+      bannedIPs[targetIP] = Date.now() + hours * 60 * 60 * 1000;
+      return res.json({
+        reply: `⛔ IP ${targetIP} für ${hours} Stunden gebannt.`
+      });
+    }
   }
 
-  /* ===== SERVER OFFLINE (NUR USER) ===== */
+  /* =========================
+     NORMALE USER REGELN
+  ========================= */
 
-  if (serverStatus === "offline" && !adminIPs.has(ip)) {
+  if (isBanned(ip)) {
+    return res.json({
+      reply: "🚫 Dein Gerät ist temporär gesperrt."
+    });
+  }
+
+  if (serverStatus === "offline") {
     return res.json({
       reply: "🚧 STRIVECORE AI HAT AKTUELL SERVER PROBLEME !"
     });
   }
 
-  /* ===== WARNINGS ===== */
-
-  checkWarnings(ip, message);
-
-  /* ===== KI CHAT ===== */
+  /* =========================
+     KI CHAT
+  ========================= */
 
   const conversation = getConversation(ip);
   conversation.push({ role: "user", content: message });
@@ -178,10 +182,18 @@ app.post("/chat", async (req, res) => {
   try {
     const completion = await openai.chat.completions.create({
       model: "gpt-4.1-mini",
+      temperature: 0.7,
+      max_tokens: 600,
       messages: [
         {
           role: "system",
-          content: "Du bist StriveCore AI. Antworte hilfreich."
+          content: `
+Du bist StriveCore AI.
+- Antworte wie ChatGPT
+- Verstehe Rechtschreibfehler
+- Antworte in der Sprache des Nutzers
+- Sei logisch, hilfreich und freundlich
+`
         },
         ...conversation
       ]
@@ -193,39 +205,11 @@ app.post("/chat", async (req, res) => {
     res.json({ reply });
 
   } catch (err) {
-    res.status(500).json({ reply: "⚠️ KI Fehler" });
+    console.error(err);
+    res.status(500).json({
+      reply: "⚠️ Serverfehler bei der KI."
+    });
   }
-});
-
-/* =========================
-   ADMIN API (FÜR MENÜ)
-========================= */
-
-/* ---- ADMIN STATUS ---- */
-app.get("/admin/status", requireAdmin, (req, res) => {
-  res.json({
-    adminIP: req.ip,
-    serverStatus,
-    onlineIPs: [...onlineIPs],
-    bannedIPs,
-    warnings,
-    logs
-  });
-});
-
-/* ---- SERVER ONLINE/OFFLINE ---- */
-app.post("/admin/server", requireAdmin, (req, res) => {
-  serverStatus = req.body.status;
-  log(`🔧 Server ${serverStatus} gesetzt von ${req.ip}`);
-  res.json({ success: true });
-});
-
-/* ---- IP BAN ---- */
-app.post("/admin/ban", requireAdmin, (req, res) => {
-  const { ip, hours } = req.body;
-  bannedIPs[ip] = Date.now() + hours * 60 * 60 * 1000;
-  log(`⛔ IP ${ip} für ${hours}h gebannt`);
-  res.json({ success: true });
 });
 
 /* =========================
