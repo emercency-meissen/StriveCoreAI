@@ -1,24 +1,13 @@
-app.post("/chat", async (req, res) => {
-  try {
-    const messages = req.body.messages;
+import express from "express";
+import fetch from "node-fetch";
+import cors from "cors";
 
-    const response = await fetch("https://api.openai.com/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        "Authorization": `Bearer ${process.env.OPENAI_KEY}`,
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({
-        model: "gpt-4o-mini",
-        messages
-      })
-    });
+const app = express(); // ⬅️ DAS HAT GEFEHLT ❗❗❗
+const PORT = process.env.PORT || 3000;
 
-    const data = await response.json();
-    res.json({ reply: data.choices[0].message.content });
+app.use(cors());
+app.use(express.json());
 
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ reply: "⚠️ KI-Fehler" });
-  }
+app.get("/", (req, res) => {
+  res.send("✅ StriveCore AI Backend läuft");
 });
