@@ -16,13 +16,11 @@
       flex-direction: column;
     }
     header {
-      background: #000;
-      color: #fff;
       padding: 14px;
       text-align: center;
       font-weight: 700;
-      position: relative;
       border-bottom: 1px solid #222;
+      position: relative;
     }
     #emergency {
       position: absolute;
@@ -33,8 +31,8 @@
       border: none;
       padding: 8px 12px;
       border-radius: 6px;
-      cursor: pointer;
       font-weight: bold;
+      cursor: pointer;
     }
     #chat {
       flex: 1;
@@ -49,43 +47,29 @@
       padding: 12px 14px;
       border-radius: 14px;
       line-height: 1.4;
-      font-size: 15px;
-      word-wrap: break-word;
     }
-    .user {
-      align-self: flex-end;
-      background: #fff;
-      color: #000;
-    }
-    .ai {
-      align-self: flex-start;
-      background: #111;
-      color: #fff;
-    }
+    .user { align-self: flex-end; background: #fff; color: #000; }
+    .ai { align-self: flex-start; background: #111; }
     footer {
       display: flex;
       gap: 8px;
       padding: 10px;
       border-top: 1px solid #222;
-      background: #000;
     }
     input {
       flex: 1;
-      padding: 12px 14px;
+      padding: 12px;
       border-radius: 20px;
       border: 1px solid #444;
       background: #000;
       color: #fff;
-      font-size: 15px;
-      outline: none;
     }
     button {
       padding: 12px 16px;
       border-radius: 20px;
-      border: 1px solid #fff;
+      border: none;
       background: #fff;
       color: #000;
-      font-size: 15px;
       cursor: pointer;
     }
   </style>
@@ -99,121 +83,84 @@
 
 <div id="chat">
   <div class="message ai">
-    Hallo 👋 Ich bin <b>StriveCore AI</b>. Schreib mir etwas.
+    Hallo 👋 Ich bin <b>StriveCore AI</b>. Frag mich alles.
   </div>
 </div>
 
 <footer>
-  <input id="input" type="text" placeholder="Nachricht schreiben…" />
+  <input id="input" placeholder="Nachricht schreiben…" />
   <button id="send">Senden</button>
 </footer>
 
 <script>
 let emergency = false;
 
-const input = document.getElementById('input');
-const sendBtn = document.getElementById('send');
-const chat = document.getElementById('chat');
-const emergencyBtn = document.getElementById('emergency');
+const chat = document.getElementById("chat");
+const input = document.getElementById("input");
 
 function addMessage(text, type) {
-  const div = document.createElement('div');
-  div.className = 'message ' + type;
+  const div = document.createElement("div");
+  div.className = "message " + type;
   div.textContent = text;
   chat.appendChild(div);
   chat.scrollTop = chat.scrollHeight;
 }
 
-function clearChat() {
-  chat.innerHTML = '';
-}
-
-// 🧠 LOKALE INTELLIGENZ (MATHE + SPRACHEN)
-function smartReply(text) {
-  const tl = text.toLowerCase().trim();
-
-  // MATHE (beliebig groß)
-  const math = tl.match(/^(\d+)\s*([+\-*/])\s*(\d+)$/);
-  if (math) {
-    const a = BigInt(math[1]);
-    const b = BigInt(math[3]);
-    const op = math[2];
-    let r;
-    if (op === '+') r = a + b;
-    if (op === '-') r = a - b;
-    if (op === '*') r = a * b;
-    if (op === '/') r = b !== 0n ? a / b : 'Division durch 0';
-    return `🧮 ${a} ${op} ${b} = ${r}`;
-  }
-
-  if (tl.includes('hallo')) return 'Hallo 👋 Wie kann ich dir helfen?';
-  if (tl.includes('hello')) return 'Hello 👋 How can I help you?';
-  if (tl.includes('bonjour')) return 'Bonjour 👋 Comment puis-je aider ?';
-  if (tl.includes('hola')) return 'Hola 👋 ¿En qué puedo ayudarte?';
-
-  return null; // wichtig!
-}
-
-// 🌐 ONLINE + FALLBACK (SAUBER)
 async function sendMessage() {
   if (emergency) return;
 
   const text = input.value.trim();
   if (!text) return;
 
-  addMessage(text, 'user');
-  input.value = '';
+  addMessage(text, "user");
+  input.value = "";
 
-  // 1️⃣ Erst lokal prüfen (Mathe etc.)
-  const local = smartReply(text);
-  if (local) {
-    addMessage(local, 'ai');
-    return;
-  }
-
-  // 2️⃣ Online KI
   try {
-    const res = await fetch('https://strivecoreai.onrender.com', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ message: text })
+    const res = await fetch("https://strivecoreai.onrender.com/chat", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        messages: [
+          {
+            role: "system",
+            content:
+              "Du bist StriveCore AI. Antworte intelligent wie ChatGPT. " +
+              "Ignoriere Rechtschreibfehler. Antworte immer in der Sprache des Nutzers. " +
+              "Wenn du etwas nicht weißt, sage ehrlich: 'Tut mir leid, das weiß ich leider nicht.'"
+          },
+          { role: "user", content: text }
+        ]
+      })
     });
 
-    if (!res.ok) throw new Error();
-
     const data = await res.json();
-    addMessage(data.reply, 'ai');
+    addMessage(data.reply, "ai");
 
   } catch {
-    addMessage('⚠️ Offline-Modus aktiv', 'ai');
-    addMessage('🤖 Ich kann gerade nur lokal antworten.', 'ai');
+    addMessage("⚠️ Verbindungsfehler zur KI.", "ai");
   }
 }
 
-// EVENTS
-sendBtn.addEventListener('click', sendMessage);
-input.addEventListener('keydown', e => {
-  if (e.key === 'Enter') {
-    e.preventDefault();
-    sendMessage();
-  }
+document.getElementById("send").onclick = sendMessage;
+input.addEventListener("keydown", e => {
+  if (e.key === "Enter") sendMessage();
 });
 
-// EMERGENCY
-emergencyBtn.addEventListener('click', () => {
+document.getElementById("emergency").onclick = () => {
   emergency = true;
-  addMessage('🚨 EMERGENCY STOP', 'ai');
-});
+  addMessage("🚨 EMERGENCY STOP", "ai");
+};
 
-// SHORTCUTS
-window.addEventListener('keydown', e => {
-  if (e.ctrlKey && e.key.toLowerCase() === 'v') {
+// STRG + V → Emergency AN
+// STRG + B → Reset
+window.addEventListener("keydown", e => {
+  if (e.ctrlKey && e.key === "v") {
     emergency = true;
-    addMessage('🚨 EMERGENCY STOP', 'ai');
+    addMessage("🚨 EMERGENCY STOP", "ai");
   }
-  if (e.ctrlKey && e.key.toLowerCase() === 'b') {
+  if (e.ctrlKey && e.key === "b") {
     emergency = false;
-    clearChat();
+    chat.innerHTML = "";
   }
 });
 </script>
