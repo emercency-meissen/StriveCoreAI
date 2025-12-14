@@ -119,18 +119,12 @@ async function sendMessage() {
     const res = await fetch("https://strivecoreai.onrender.com/chat", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
+
+      /* ✅ HIER IST DIE EINZIGE ÄNDERUNG */
       body: JSON.stringify({
-        messages: [
-          {
-            role: "system",
-            content:
-              "Du bist StriveCore AI. Antworte intelligent wie ChatGPT. " +
-              "Ignoriere Rechtschreibfehler. Antworte immer in der Sprache des Nutzers. " +
-              "Wenn du etwas nicht weißt, sage ehrlich: 'Tut mir leid, das weiß ich leider nicht.'"
-          },
-          { role: "user", content: text }
-        ]
+        message: text
       })
+      /* ✅ SONST NICHTS */
     });
 
     const data = await res.json();
@@ -154,11 +148,11 @@ document.getElementById("emergency").onclick = () => {
 // STRG + V → Emergency AN
 // STRG + B → Reset
 window.addEventListener("keydown", e => {
-  if (e.ctrlKey && e.key === "v") {
+  if (e.ctrlKey && e.key.toLowerCase() === "v") {
     emergency = true;
     addMessage("🚨 EMERGENCY STOP", "ai");
   }
-  if (e.ctrlKey && e.key === "b") {
+  if (e.ctrlKey && e.key.toLowerCase() === "b") {
     emergency = false;
     chat.innerHTML = "";
   }
