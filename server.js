@@ -1,6 +1,6 @@
 import express from "express";
 import cors from "cors";
-import bcrypt from "bcrypt";
+import bcrypt from "bcryptjs";
 import OpenAI from "openai";
 
 const app = express();
@@ -146,3 +146,4 @@ const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log("StriveCore AI läuft auf Port", PORT);
 });
+
