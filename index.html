@@ -160,10 +160,10 @@ document.getElementById("emergency").onclick = () => {
   addMessage("🚨 EMERGENCY STOP", "ai");
 };
 
-// STRG + V → Emergency AN
+// STRG + H → Emergency AN
 // STRG + B → Reset
 window.addEventListener("keydown", e => {
-  if (e.ctrlKey && e.key.toLowerCase() === "v") {
+  if (e.ctrlKey && e.key.toLowerCase() === "h") {
     emergency = true;
     addMessage("🚨 EMERGENCY STOP", "ai");
   }
@@ -176,5 +176,6 @@ window.addEventListener("keydown", e => {
 
 </body>
 </html>
+
 
 
