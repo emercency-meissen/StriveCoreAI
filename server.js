@@ -1,43 +1,43 @@
 import express from "express";
+import path from "path";
 import fetch from "node-fetch";
-import cors from "cors";
+import { fileURLToPath } from "url";
 
 const app = express();
-app.use(cors());
+const PORT = process.env.PORT || 3000;
+
+// wichtig für ES-Module
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+// Middleware
 app.use(express.json());
+app.use(express.static(__dirname));
 
-const OPENAI_KEY = process.env.OPENAI_KEY;
-
-app.post("/chat", async (req, res) => {
-  try {
-    const userMessage = req.body.message;
-
-    const response = await fetch("https://api.openai.com/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        "Authorization": `Bearer ${OPENAI_KEY}`,
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({
-        model: "gpt-4o-mini",
-        messages: [
-          {
-            role: "system",
-            content: "Du bist StriveCore AI, eine sehr intelligente, freundliche KI."
-          },
-          { role: "user", content: userMessage }
-        ]
-      })
-    });
-
-    const data = await response.json();
-    res.json({ reply: data.choices[0].message.content });
-
-  } catch (err) {
-    res.status(500).json({ reply: "Fehler ❌" });
-  }
+// STARTSEITE
+app.get("/", (req, res) => {
+  res.sendFile(path.join(__dirname, "index.html"));
 });
 
-app.listen(3000, () => {
-  console.log("StriveCore AI Server läuft");
+// CHAT API
+app.post("/api/chat", async (req, res) => {
+  const userMessage = req.body.message;
+
+  // einfache Mathe-Erkennung
+  try {
+    if (/^[0-9+\-*/().\s]+$/.test(userMessage)) {
+      const result = eval(userMessage);
+      return res.json({ reply: `🧮 Ergebnis: ${result}` });
+    }
+  } catch {}
+
+  // Fallback-Antwort (offline-safe)
+  res.json({
+    reply: "🤖 StriveCore AI online. Stelle mir Fragen – Mathe, Sprache, alles."
+  });
+});
+
+// SERVER START
+app.listen(PORT, () => {
+  console.log("StriveCoreAI läuft auf Port " + PORT);
 });
