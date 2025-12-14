@@ -101,60 +101,51 @@ app.post("/chat", async (req, res) => {
   const ip = req.ip;
   const { message } = req.body;
 
-  if (isBanned(ip)) {
-    return res.json({
-      reply: "🚫 Dein Gerät ist temporär gesperrt."
-    });
-  }
-
-  /* SERVER OFFLINE */
-  if (serverStatus === "offline") {
-    return res.json({
-      reply: "🚧 STRIVECORE AI HAT AKTUELL SERVER PROBLEME !"
-    });
-  }
-
   if (!message) {
-    return res.json({
-      reply: "Tut mir leid, ich habe nichts verstanden."
-    });
+    return res.json({ reply: "Tut mir leid, ich habe nichts verstanden." });
+  }
+
+  if (isBanned(ip)) {
+    return res.json({ reply: "🚫 Dein Gerät ist temporär gesperrt." });
   }
 
   /* =========================
-     ADMIN COMMANDS (CHAT)
+     ADMIN LOGIN (IMMER ERLAUBT)
   ========================= */
 
-  // ADMIN LOGIN
   if (message.startsWith("/admin login")) {
     const pass = message.split(" ")[2];
     if (pass === ADMIN_PASSWORD) {
       adminIPs.add(ip);
-      return res.json({
-        reply: "🛡️ Admin-Modus aktiviert."
-      });
+      return res.json({ reply: "🛡️ Admin-Modus aktiviert." });
     }
     return res.json({ reply: "❌ Falsches Admin-Passwort." });
   }
 
+  /* =========================
+     ADMIN COMMANDS
+  ========================= */
+
   if (adminIPs.has(ip)) {
 
-    // SERVER STATUS
     if (message.startsWith("/admin server")) {
       const mode = message.split(" ")[2];
+
       if (mode === "online") {
         serverStatus = "online";
         return res.json({ reply: "🟢 Server ist ONLINE." });
       }
+
       if (mode === "offline") {
         serverStatus = "offline";
         return res.json({ reply: "🔴 Server ist OFFLINE." });
       }
+
       return res.json({
         reply: "⚙️ Nutzung: /admin server online | offline"
       });
     }
 
-    // IP BAN
     if (message.startsWith("/admin ban")) {
       const parts = message.split(" ");
       const targetIP = parts[2];
@@ -171,6 +162,16 @@ app.post("/chat", async (req, res) => {
         reply: `⛔ IP ${targetIP} für ${hours} Stunden gebannt.`
       });
     }
+  }
+
+  /* =========================
+     SERVER OFFLINE (NUR USER)
+  ========================= */
+
+  if (serverStatus === "offline") {
+    return res.json({
+      reply: "🚧 STRIVECORE AI HAT AKTUELL SERVER PROBLEME !"
+    });
   }
 
   /* =========================
