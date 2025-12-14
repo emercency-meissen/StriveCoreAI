@@ -8,33 +8,39 @@ app.use(cors());
 app.use(express.json());
 
 /* =========================
-   KONFIG
+   OPENAI
 ========================= */
-
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY
 });
 
 /* =========================
-   SPEICHER (einfach, aber stabil)
+   SPEICHER (einfach)
 ========================= */
-
 const users = {};           // email -> { passwordHash }
-const bans = {};            // ip -> timestamp
 const conversations = {};   // ip -> messages[]
+const admins = {};          // ip -> true
+const bans = {};            // ip -> timestamp
 
 /* =========================
    HILFSFUNKTIONEN
 ========================= */
+function getIP(req) {
+  return req.headers["x-forwarded-for"]?.split(",")[0] || req.socket.remoteAddress;
+}
 
 function isBanned(ip) {
   if (!bans[ip]) return false;
   return Date.now() - bans[ip] < 24 * 60 * 60 * 1000;
 }
 
-function getConversation(id) {
-  if (!conversations[id]) conversations[id] = [];
-  return conversations[id];
+function getConversation(ip) {
+  if (!conversations[ip]) conversations[ip] = [];
+  return conversations[ip];
+}
+
+function isAdmin(ip) {
+  return admins[ip] === true;
 }
 
 /* =========================
@@ -45,15 +51,20 @@ app.get("/", (req, res) => {
   res.send("✅ StriveCore AI Backend läuft");
 });
 
-/* -------- LOGIN / REGISTER -------- */
-
+/* -------- REGISTER -------- */
 app.post("/register", async (req, res) => {
   const { email, password } = req.body;
-  const ip = req.ip;
+  const ip = getIP(req);
+
+  if (!email || !password) {
+    return res.status(400).json({ error: "Fehlende Daten" });
+  }
 
   if (users[email]) {
     bans[ip] = Date.now();
-    return res.status(403).json({ error: "Email existiert bereits. 24h Ban." });
+    return res.status(403).json({
+      error: "Email existiert bereits. Gerät 24h gesperrt."
+    });
   }
 
   const hash = await bcrypt.hash(password, 10);
@@ -62,42 +73,60 @@ app.post("/register", async (req, res) => {
   res.json({ success: true });
 });
 
+/* -------- LOGIN -------- */
 app.post("/login", async (req, res) => {
   const { email, password } = req.body;
   const user = users[email];
 
-  if (!user) return res.status(401).json({ error: "Login fehlgeschlagen" });
+  if (!user) {
+    return res.status(401).json({ error: "Login fehlgeschlagen" });
+  }
 
   const ok = await bcrypt.compare(password, user.passwordHash);
-  if (!ok) return res.status(401).json({ error: "Login fehlgeschlagen" });
+  if (!ok) {
+    return res.status(401).json({ error: "Login fehlgeschlagen" });
+  }
 
   res.json({ success: true });
 });
 
 /* -------- CHAT -------- */
-
 app.post("/chat", async (req, res) => {
-  const ip = req.ip;
+  const ip = getIP(req);
   const { message } = req.body;
 
   if (isBanned(ip)) {
-    return res.status(403).json({
-      reply: "🚫 Dein Gerät ist für 24 Stunden gesperrt."
-    });
+    return res.json({ reply: "🚫 Dein Gerät ist 24h gesperrt." });
   }
 
   if (!message) {
-    return res.json({
-      reply: "Tut mir leid, ich habe nichts verstanden."
-    });
+    return res.json({ reply: "Tut mir leid, ich habe nichts verstanden." });
+  }
+
+  /* ===== ADMIN LOGIN PER CHAT ===== */
+  if (message.startsWith("/admin login")) {
+    const pw = message.split(" ")[2];
+
+    if (!pw) {
+      return res.json({ reply: "❌ Passwort fehlt." });
+    }
+
+    if (pw === process.env.ADMIN_PASSWORD) {
+      admins[ip] = true;
+      return res.json({ reply: "✅ Admin-Modus aktiviert." });
+    } else {
+      return res.json({ reply: "❌ Falsches Admin-Passwort." });
+    }
+  }
+
+  /* ===== ADMIN BEFEHLE ===== */
+  if (message === "/admin clear" && isAdmin(ip)) {
+    conversations[ip] = [];
+    return res.json({ reply: "🧹 Chat gelöscht (Admin)." });
   }
 
   const conversation = getConversation(ip);
-
-  conversation.push({
-    role: "user",
-    content: message
-  });
+  conversation.push({ role: "user", content: message });
 
   try {
     const completion = await openai.chat.completions.create({
@@ -122,11 +151,7 @@ Du bist StriveCore AI.
     });
 
     const reply = completion.choices[0].message.content;
-
-    conversation.push({
-      role: "assistant",
-      content: reply
-    });
+    conversation.push({ role: "assistant", content: reply });
 
     res.json({ reply });
 
@@ -141,35 +166,7 @@ Du bist StriveCore AI.
 /* =========================
    SERVER START
 ========================= */
-
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log("StriveCore AI läuft auf Port", PORT);
 });
-app.post("/image", async (req, res) => {
-  const { prompt } = req.body;
-
-  if (!prompt) {
-    return res.status(400).json({ error: "Kein Prompt angegeben" });
-  }
-
-  try {
-    const image = await openai.images.generate({
-      model: "gpt-image-1",
-      prompt: prompt,
-      size: "1024x1024"
-    });
-
-    res.json({
-      image: image.data[0].url
-    });
-
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({
-      error: "Bild konnte nicht erstellt werden"
-    });
-  }
-});
-
-
