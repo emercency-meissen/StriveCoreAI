@@ -94,7 +94,7 @@
 
 <header>
   StriveCore AI
-  <button id="emergency">STOP</button>
+  <button id="emergency">EMERGENCY STOP</button>
 </header>
 
 <div id="chat">
@@ -123,12 +123,14 @@ function addMessage(text, type) {
   chat.scrollTop = chat.scrollHeight;
 }
 
+function clearChat() {
+  chat.innerHTML = '';
+}
+
 function smartReply(text) {
   const t = text.trim();
   const tl = t.toLowerCase();
 
-  // 🧮 MATHE – SEHR GROẞE ZAHLEN (BigInt)
-  // Beispiele: 120+351 | 999999999999+888888888888 | 7*8
   const math = tl.match(/^(\d+)\s*([+\-*/])\s*(\d+)$/);
   if (math) {
     try {
@@ -136,37 +138,30 @@ function smartReply(text) {
       const b = BigInt(math[3]);
       const op = math[2];
       let r;
-
       if (op === '+') r = a + b;
       if (op === '-') r = a - b;
       if (op === '*') r = a * b;
       if (op === '/') r = b !== 0n ? a / b : 'Division durch 0';
-
-      return `🧮 ${a.toString()} ${op} ${b.toString()} = ${r.toString()}`;
+      return `🧮 ${a} ${op} ${b} = ${r}`;
     } catch {
       return '❌ Mathe-Fehler';
     }
   }
 
-  // 🌍 SPRACHEGRENZ-NEUTRAL
   if (tl.includes('hallo') || tl.includes('hello'))
-    return '👋 Hello! I can understand many languages. Try math or ask something simple.';
+    return '👋 Hello! I can understand many languages.';
 
   if (tl.includes('wer bist') || tl.includes('who are you'))
-    return '🤖 I am StriveCore AI, a local demo assistant.';
+    return '🤖 I am StriveCore AI.';
 
   if (tl.includes('hilfe') || tl.includes('help'))
     return '🆘 I can help with math and basic answers.';
 
-  return '🤖 Ich habe dich verstanden. Für echtes Weltwissen brauche ich eine Online-KI.';
+  return '🤖 Ich habe dich verstanden.';
 }
 
-
 function sendMessage() {
-  if (emergency) {
-    addMessage('⛔ KI gestoppt.', 'ai');
-    return;
-  }
+  if (emergency) return;
 
   const text = input.value.trim();
   if (text === '') return;
@@ -188,16 +183,25 @@ input.addEventListener('keydown', function(e) {
   }
 });
 
+// BUTTON → Emergency Stop AN
 emergencyBtn.addEventListener('click', function() {
   emergency = true;
   addMessage('🚨 EMERGENCY STOP', 'ai');
 });
 
-// STRG + G
+// TASTEN
 window.addEventListener('keydown', function(e) {
-  if (e.ctrlKey && e.key.toLowerCase() === 'g') {
+
+  // STRG + V → Emergency Stop AN
+  if (e.ctrlKey && e.key.toLowerCase() === 'v') {
     emergency = true;
-    addMessage('🚨 EMERGENCY STOP (STRG+G)', 'ai');
+    addMessage('🚨 EMERGENCY STOP', 'ai');
+  }
+
+  // STRG + B → Chat löschen + Emergency AUS
+  if (e.ctrlKey && e.key.toLowerCase() === 'b') {
+    emergency = false;
+    clearChat();
   }
 });
 </script>
