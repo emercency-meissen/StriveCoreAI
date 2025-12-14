@@ -146,4 +146,30 @@ const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log("StriveCore AI läuft auf Port", PORT);
 });
+app.post("/image", async (req, res) => {
+  const { prompt } = req.body;
+
+  if (!prompt) {
+    return res.status(400).json({ error: "Kein Prompt angegeben" });
+  }
+
+  try {
+    const image = await openai.images.generate({
+      model: "gpt-image-1",
+      prompt: prompt,
+      size: "1024x1024"
+    });
+
+    res.json({
+      image: image.data[0].url
+    });
+
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({
+      error: "Bild konnte nicht erstellt werden"
+    });
+  }
+});
+
 
