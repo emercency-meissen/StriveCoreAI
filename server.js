@@ -1,43 +1,46 @@
 import express from "express";
-import path from "path";
 import fetch from "node-fetch";
-import { fileURLToPath } from "url";
+import cors from "cors";
 
 const app = express();
-const PORT = process.env.PORT || 3000;
-
-// wichtig für ES-Module
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-
-// Middleware
+app.use(cors());
 app.use(express.json());
-app.use(express.static(__dirname));
 
-// STARTSEITE
-app.get("/", (req, res) => {
-  res.sendFile(path.join(__dirname, "index.html"));
-});
+const OPENAI_KEY = process.env.OPENAI_KEY;
 
-// CHAT API
-app.post("/api/chat", async (req, res) => {
-  const userMessage = req.body.message;
-
-  // einfache Mathe-Erkennung
+app.post("/chat", async (req, res) => {
   try {
-    if (/^[0-9+\-*/().\s]+$/.test(userMessage)) {
-      const result = eval(userMessage);
-      return res.json({ reply: `🧮 Ergebnis: ${result}` });
-    }
-  } catch {}
+    const messages = req.body.messages;
 
-  // Fallback-Antwort (offline-safe)
-  res.json({
-    reply: "🤖 StriveCore AI online. Stelle mir Fragen – Mathe, Sprache, alles."
-  });
+    if (!messages) {
+      return res.json({ reply: "Fehler: Keine Nachricht erhalten." });
+    }
+
+    const response = await fetch("https://api.openai.com/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${OPENAI_KEY}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        model: "gpt-4o-mini",
+        messages
+      })
+    });
+
+    const data = await response.json();
+
+    res.json({
+      reply: data.choices?.[0]?.message?.content
+        || "Tut mir leid, ich weiß es leider nicht."
+    });
+
+  } catch (err) {
+    console.error(err);
+    res.json({ reply: "Serverfehler ❌" });
+  }
 });
 
-// SERVER START
-app.listen(PORT, () => {
-  console.log("StriveCoreAI läuft auf Port " + PORT);
+app.listen(3000, () => {
+  console.log("StriveCore AI Server läuft");
 });
