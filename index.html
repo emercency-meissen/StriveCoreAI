@@ -4,34 +4,31 @@
 <meta charset="UTF-8">
 <title>StriveCoreAI</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<link rel="stylesheet" href="/style.css">
+<link rel="stylesheet" href="style.css">
 </head>
 <body>
 
-<div id="loginBox">
-  <h2>StriveCoreAI</h2>
-  <input id="user" placeholder="Username">
-  <input id="pass" type="password" placeholder="Passwort">
-  <button onclick="login()">Login</button>
-  <button onclick="register()">Registrieren</button>
+<header>⚡ StriveCoreAI</header>
+
+<main id="chat"></main>
+
+<footer>
+  <textarea id="input" placeholder="Bitte zuerst einloggen…" disabled></textarea>
+  <button id="send" disabled>➤</button>
+</footer>
+
+<!-- LOGIN OVERLAY -->
+<div id="overlay">
+  <div class="loginBox">
+    <h3>Anmelden</h3>
+    <input id="user" placeholder="Username">
+    <input id="pass" type="password" placeholder="Passwort">
+    <button onclick="login()">Login</button>
+    <button onclick="register()">Registrieren</button>
+    <p id="err"></p>
+  </div>
 </div>
 
-<div id="app" hidden>
-  <aside>
-    <b>StriveCoreAI</b>
-    <button onclick="newChat()">➕ Neuer Chat</button>
-  </aside>
-
-  <main>
-    <div id="chat"></div>
-    <div id="inputBar">
-      <textarea id="input" placeholder="Stelle irgendeine Frage"></textarea>
-      <button onclick="send()">➤</button>
-    </div>
-  </main>
-</div>
-
-<script src="/app.js"></script>
-<script src="/auth.js"></script>
+<script src="app.js"></script>
 </body>
 </html>
