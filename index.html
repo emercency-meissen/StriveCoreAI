@@ -5,53 +5,16 @@
 <title>StriveCore AI</title>
 
 <style>
-body {
-  background:#000;
-  color:#fff;
-  font-family:sans-serif;
-  margin:0;
+body { background:#000; color:#fff; font-family:sans-serif; }
+#chat { height:80vh; overflow:auto; }
+
+.header {
+  margin-bottom:10px;
 }
 
-#header {
-  padding:10px;
-  border-bottom:1px solid #333;
-}
-
-#title {
-  font-size:22px;
-  font-weight:bold;
-}
-
-#emergency {
-  color:#ff4444;
+.warning {
+  color:#ffcc00;
   font-size:14px;
-}
-
-#chat {
-  height:75vh;
-  overflow:auto;
-  padding:10px;
-}
-
-#inputArea {
-  padding:10px;
-  border-top:1px solid #333;
-}
-
-#input {
-  width:70%;
-  padding:6px;
-  background:#000;
-  color:#fff;
-  border:1px solid #444;
-}
-
-button {
-  padding:6px 10px;
-  background:#111;
-  color:#fff;
-  border:1px solid #444;
-  cursor:pointer;
 }
 
 .adminMenu {
@@ -62,24 +25,34 @@ button {
   border:1px solid #444;
   padding:10px;
   display:none;
-  font-size:14px;
+  width:260px;
 }
+
+.adminLogs {
+  margin-top:10px;
+  background:#000;
+  border:1px solid #333;
+  padding:5px;
+  height:100px;
+  overflow:auto;
+  font-size:12px;
+}
+
+button { margin:4px; }
 </style>
 </head>
 
 <body>
 
-<div id="header">
-  <div id="title">StriveCore AI</div>
-  <div id="emergency">⚠️ Emergency Mode aktiv – System wird überwacht</div>
+<div class="header">
+  <h2>StriveCore AI</h2>
+  <div class="warning">⚠️ Emergency Mode aktiv – System wird überwacht</div>
 </div>
 
 <div id="chat"></div>
 
-<div id="inputArea">
-  <input id="input" placeholder="Nachricht eingeben">
-  <button onclick="send()">Senden</button>
-</div>
+<input id="input">
+<button onclick="send()">Senden</button>
 
 <!-- ADMIN MENÜ -->
 <div class="adminMenu" id="adminMenu">
@@ -88,26 +61,35 @@ button {
   <button onclick="setStatus('online')">🟢 Online</button>
   <button onclick="setStatus('offline')">🔴 Offline</button><br><br>
 
-  <input id="banIP" placeholder="IP"><br>
-  <input id="banTime" type="number" placeholder="Stunden"><br>
-  <button onclick="ban()">IP bannen</button>
+  <input id="banIP" placeholder="IP">
+  <input id="banTime" placeholder="Std" type="number">
+  <button onclick="ban()">Ban</button>
+
+  <div class="adminLogs" id="adminLogs">
+    <b>Logs:</b><br>
+  </div>
 </div>
 
 <script>
 const chat = document.getElementById("chat");
 const adminMenu = document.getElementById("adminMenu");
-const input = document.getElementById("input");
+const adminLogs = document.getElementById("adminLogs");
 
 function add(text) {
   chat.innerHTML += "<div>" + text + "</div>";
   chat.scrollTop = chat.scrollHeight;
 }
 
+function log(text) {
+  adminLogs.innerHTML += text + "<br>";
+  adminLogs.scrollTop = adminLogs.scrollHeight;
+}
+
 async function send(msg=null) {
   const text = msg || input.value;
+  input.value = "";
   if (!text) return;
 
-  input.value = "";
   add("DU: " + text);
 
   const res = await fetch("https://strivecoreai.onrender.com/chat", {
@@ -121,10 +103,16 @@ async function send(msg=null) {
 
   if (data.admin === true) {
     adminMenu.style.display = "block";
+    log("Admin eingeloggt");
+  }
+
+  if (data.log) {
+    log(data.log);
   }
 }
 
 function setStatus(s) {
+  log("Server -> " + s);
   send("__ADMIN_SET_STATUS__:" + s);
 }
 
@@ -132,6 +120,7 @@ function ban() {
   const ip = banIP.value;
   const h = banTime.value;
   if (!ip || !h) return;
+  log("Ban IP " + ip + " für " + h + "h");
   send("__ADMIN_BAN__:" + ip + ":" + h);
 }
 </script>
