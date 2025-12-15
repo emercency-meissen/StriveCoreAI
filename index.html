@@ -2,133 +2,40 @@
 <html lang="de">
 <head>
 <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
 <title>StriveCore AI</title>
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<style>
-body{margin:0;background:#0b0b0b;color:#fff;font-family:Arial;height:100vh}
-#login,#app{display:none;height:100%}
-.center{display:flex;align-items:center;justify-content:center;height:100%}
-input,button{background:#111;color:#fff;border:1px solid #333;padding:8px;margin:4px}
-aside{width:240px;background:#111;padding:10px}
-main{flex:1;display:flex;flex-direction:column}
-#chat{flex:1;padding:10px;overflow:auto}
-.msg{margin:6px 0}
-.user{text-align:right;color:#aaa}
-.ai{color:#fff}
-#admin{position:fixed;right:10px;bottom:10px;background:#111;padding:10px;border:1px solid #333;display:none}
-</style>
+<link rel="stylesheet" href="/style.css">
 </head>
 <body>
 
-<!-- LOGIN -->
-<div id="login" class="center">
-  <div>
-    <img src="logo.png" width="220"><br>
-    <input id="luser" placeholder="Username">
-    <input id="lpass" type="password" placeholder="Passwort"><br>
-    <button onclick="login()">Login</button>
-    <button onclick="register()">Registrieren</button>
-  </div>
+<div id="loginBox">
+  <h2>Login</h2>
+  <input id="user" placeholder="Username">
+  <input id="pass" type="password" placeholder="Passwort">
+  <button onclick="login()">Login</button>
+  <button onclick="register()">Registrieren</button>
 </div>
 
-<!-- APP -->
-<div id="app" style="display:flex">
+<div id="app" hidden>
   <aside>
-    <b>Chats</b><br>
+    <b>StriveCore AI</b>
     <button onclick="newChat()">➕ Neuer Chat</button>
-    <div id="chatList"></div>
-    <hr>
     <div id="account"></div>
-    <button onclick="logout()">Logout</button>
   </aside>
 
   <main>
     <div id="chat"></div>
-    <div style="padding:10px">
-      <input id="input" placeholder="Nachricht..." style="width:80%">
+    <div class="inputBar">
+      <input id="input" placeholder="Nachricht…">
       <button onclick="send()">Senden</button>
     </div>
   </main>
+
+  <div id="adminMenu"></div>
 </div>
 
-<div id="admin"></div>
-
-<script>
-let chatId = null;
-
-function show(id){
-  login.style.display="none";
-  app.style.display="none";
-  document.getElementById(id).style.display="flex";
-}
-
-async function init(){
-  const r = await fetch("/api/me");
-  const d = await r.json();
-
-  if(d.loggedIn){
-    account.textContent = "User: " + d.user;
-    show("app");
-    newChat();
-  } else {
-    show("login");
-  }
-}
-
-init();
-
-
-async function register(){
-  await fetch("/api/register",{method:"POST",headers:{"Content-Type":"application/json"},
-  body:JSON.stringify({username:luser.value,password:lpass.value})});
-  login();
-}
-
-async function login(){
-  const r = await fetch("/api/login",{method:"POST",headers:{"Content-Type":"application/json"},
-  body:JSON.stringify({username:luser.value,password:lpass.value})});
-  const d = await r.json();
-  if(d.ok){
-  location.reload();
-  }
-
-}
-
-async function logout(){
-  await fetch("/api/logout",{method:"POST"});
-  show("login");
-}
-
-function newChat(){
-  chatId="chat-"+Date.now();
-  chat.innerHTML="";
-  add("Willkommen bei StriveCore AI 👋","ai");
-}
-
-function add(t,c){
-  const d=document.createElement("div");
-  d.className="msg "+c;
-  d.textContent=t;
-  chat.appendChild(d);
-  chat.scrollTop=chat.scrollHeight;
-}
-
-async function send(){
-  const text=input.value;
-  input.value="";
-  add(text,"user");
-  const r=await fetch("/api/chat",{method:"POST",headers:{"Content-Type":"application/json"},
-  body:JSON.stringify({chatId,message:text})});
-  const d=await r.json();
-  add(d.reply,"ai");
-
-  if(d.admin){
-    admin.style.display="block";
-    admin.innerHTML="<b>ADMIN</b><br>IP: "+d.ip+"<br>Online:<br>"+Object.keys(d.online).join("<br>");
-  }
-}
-</script>
+<script src="/app.js"></script>
+<script src="/auth.js"></script>
+<script src="/admin.js"></script>
 </body>
 </html>
-
-
