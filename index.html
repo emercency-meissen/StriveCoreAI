@@ -4,34 +4,23 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>StriveCore AI</title>
-<link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="/style.css">
 </head>
 <body>
 
-<div id="loginBox">
-  <h2>Login</h2>
-  <input id="user"><input id="pass" type="password">
-  <button onclick="login()">Login</button>
-  <button onclick="register()">Registrieren</button>
-</div>
+<aside>
+  <b>StriveCore AI</b>
+  <button onclick="newChat()">➕ Neuer Chat</button>
+</aside>
 
-<div id="app" hidden>
-  <aside>
-    <b>StriveCore AI</b>
-    <button onclick="newChat()">➕ Neuer Chat</button>
-    <div id="account"></div>
-  </aside>
+<main>
+  <div id="chat"></div>
+  <div class="inputBar">
+    <input id="input" placeholder="Nachricht…">
+    <button onclick="send()">Senden</button>
+  </div>
+</main>
 
-  <main>
-    <div id="chat"></div>
-    <input id="input"><button onclick="send()">Senden</button>
-  </main>
-
-  <div id="adminMenu" hidden></div>
-</div>
-
-<script src="app.js"></script>
-<script src="auth.js"></script>
-<script src="admin.js"></script>
+<script src="/app.js"></script>
 </body>
 </html>
