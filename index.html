@@ -1,0 +1,94 @@
+<script>
+// ===== STABILER CORE =====
+let emergency = false;
+
+const input = document.getElementById('input');
+const sendBtn = document.getElementById('send');
+const chat = document.getElementById('chat');
+const emergencyBtn = document.getElementById('emergency');
+
+function addMessage(text, type) {
+  const div = document.createElement('div');
+  div.className = 'message ' + type;
+  div.textContent = text;
+  chat.appendChild(div);
+  chat.scrollTop = chat.scrollHeight;
+}
+
+function clearChat() {
+  chat.innerHTML = '';
+}
+
+function smartReply(text) {
+  const t = text.trim();
+  const tl = t.toLowerCase();
+
+  // 🧮 MATHE (BigInt)
+  const math = tl.match(/^(\d+)\s*([+\-*/])\s*(\d+)$/);
+  if (math) {
+    try {
+      const a = BigInt(math[1]);
+      const b = BigInt(math[3]);
+      const op = math[2];
+      let r;
+      if (op === '+') r = a + b;
+      if (op === '-') r = a - b;
+      if (op === '*') r = a * b;
+      if (op === '/') r = b !== 0n ? a / b : 'Division durch 0';
+      return `🧮 ${a} ${op} ${b} = ${r}`;
+    } catch {
+      return '❌ Mathe-Fehler';
+    }
+  }
+
+  if (tl.includes('hallo') || tl.includes('hello'))
+    return '👋 Hallo! Wie kann ich dir helfen?';
+
+  return '🤖 Ich habe dich verstanden.';
+}
+
+function sendMessage() {
+  if (emergency) return; // 🔴 komplett blockieren, KEINE Meldung
+
+  const text = input.value.trim();
+  if (text === '') return;
+
+  addMessage(text, 'user');
+  input.value = '';
+
+  setTimeout(() => {
+    addMessage(smartReply(text), 'ai');
+  }, 200);
+}
+
+// 🔘 BUTTON → Emergency Stop AN
+emergencyBtn.addEventListener('click', () => {
+  emergency = true;
+  addMessage('🚨 EMERGENCY STOP', 'ai');
+});
+
+// ✉️ SENDEN
+sendBtn.addEventListener('click', sendMessage);
+input.addEventListener('keydown', e => {
+  if (e.key === 'Enter') {
+    e.preventDefault();
+    sendMessage();
+  }
+});
+
+// ⌨️ TASTENKOMBINATIONEN
+window.addEventListener('keydown', e => {
+
+  // 🚨 STRG + V → Emergency Stop AN
+  if (e.ctrlKey && e.key.toLowerCase() === 'v') {
+    emergency = true;
+    addMessage('🚨 EMERGENCY STOP', 'ai');
+  }
+
+  // 🟢 STRG + B → Chat leeren + KI frei
+  if (e.ctrlKey && e.key.toLowerCase() === 'b') {
+    emergency = false;
+    clearChat();
+  }
+});
+</script>
