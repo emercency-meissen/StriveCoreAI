@@ -4,132 +4,72 @@
 <meta charset="UTF-8">
 <title>StriveCore AI</title>
 <style>
-body {
-  margin:0;
-  background:#000;
-  color:#fff;
-  font-family:Arial;
-}
-header {
-  padding:10px;
-  border-bottom:1px solid #333;
-}
-#chat {
-  height:75vh;
-  overflow:auto;
-  padding:10px;
-}
-.msg {
-  margin:6px 0;
-}
-.ai { color:#fff; }
-.user { color:#aaa; text-align:right; }
-input {
-  width:80%;
-  background:#111;
-  color:#fff;
-  border:1px solid #333;
-}
-button {
-  background:#222;
-  color:#fff;
-  border:1px solid #444;
-}
-#adminMenu {
-  position:fixed;
-  bottom:20px;
-  right:20px;
-  background:#111;
-  border:1px solid #444;
-  padding:10px;
-  display:none;
-  width:260px;
-}
-.small {
-  font-size:12px;
-  color:#aaa;
-}
+body{margin:0;background:#000;color:#fff;font-family:Arial}
+header{padding:10px;border-bottom:1px solid #333}
+#chat{height:70vh;overflow:auto;padding:10px}
+.msg{margin:6px 0}
+.user{text-align:right;color:#aaa}
+.ai{color:#fff}
+#adminMenu{position:fixed;bottom:20px;right:20px;background:#111;
+border:1px solid #444;padding:10px;width:260px;display:none}
+.small{font-size:12px;color:#aaa}
 </style>
 </head>
 <body>
 
 <header>
-  <h2>StriveCore AI</h2>
-  <div class="small">⚠️ Emergency Mode aktiv – System wird überwacht</div>
+<h2>StriveCore AI</h2>
+<div class="small">⚠️ Emergency Mode aktiv – System wird überwacht</div>
 </header>
 
+<div id="announcement" class="small"></div>
 <div id="chat"></div>
 
 <div style="padding:10px">
-  <input id="input" placeholder="Nachricht…">
-  <button onclick="send()">Senden</button>
+<input id="input" placeholder="Nachricht…" style="width:80%">
+<button onclick="send()">Senden</button>
 </div>
 
 <div id="adminMenu">
-  <b>STRIVECORE AI ADMIN MENÜ</b>
-  <div class="small" id="adminIP"></div>
-  <hr>
-  <button onclick="admin('ONLINE')">🟢 Online</button>
-  <button onclick="admin('OFFLINE')">🔴 Offline</button>
-  <hr>
-  <input id="banIP" placeholder="IP">
-  <input id="banH" placeholder="Std" type="number">
-  <button onclick="ban()">Ban</button>
-  <hr>
-  <b>Logs</b>
-  <div id="logs" class="small"></div>
-  <hr>
-  <b>Warnings</b>
-  <div id="warnings" class="small"></div>
+<b>STRIVECORE AI ADMIN MENÜ</b>
+<div id="adminIP" class="small"></div>
+<hr>
+<button onclick="admin('ON')">🟢 Online</button>
+<button onclick="admin('OFF')">🔴 Offline</button>
+<hr>
+<input id="banIP" placeholder="IP">
+<input id="banH" type="number" placeholder="Std">
+<button onclick="ban()">Ban</button>
+<hr>
+<input id="annTxt" placeholder="Ankündigung">
+<input id="annMin" type="number" placeholder="Min">
+<button onclick="announce()">Senden</button>
+<hr>
+<b>Logs</b><div id="logs" class="small"></div>
+<b>Warnings</b><div id="warn" class="small"></div>
 </div>
 
 <script>
-let chatId = "main";
-const chat = document.getElementById("chat");
-const adminMenu = document.getElementById("adminMenu");
+const chat=document.getElementById("chat");
+function add(t,c){const d=document.createElement("div");d.className="msg "+c;d.textContent=t;chat.appendChild(d);chat.scrollTop=chat.scrollHeight;}
 
-function add(text, cls) {
-  const d = document.createElement("div");
-  d.className = "msg " + cls;
-  d.textContent = text;
-  chat.appendChild(d);
-  chat.scrollTop = chat.scrollHeight;
-}
-
-async function send(custom=null) {
-  const text = custom || input.value;
-  input.value = "";
-  if (!custom) add(text, "user");
-
-  const res = await fetch("/chat", {
-    method:"POST",
-    headers:{ "Content-Type":"application/json" },
-    body:JSON.stringify({ message:text, chatId })
-  });
-
-  const data = await res.json();
-  add(data.reply, "ai");
-
-  if (data.admin) {
-    adminMenu.style.display = "block";
-    document.getElementById("adminIP").textContent = "Deine IP: " + data.ip;
-    document.getElementById("logs").innerHTML =
-      (data.logs||[]).slice(-6).join("<br>");
-    document.getElementById("warnings").innerHTML =
-      (data.warnings||[]).slice(-6).map(w =>
-        `[${w.type}] ${w.ip}`
-      ).join("<br>");
-  }
-}
-
-function admin(type) {
-  send(type === "ONLINE" ? "__ADMIN_ONLINE__" : "__ADMIN_OFFLINE__");
-}
-function ban() {
-  send(`__ADMIN_BAN__:${banIP.value}:${banH.value}`);
-}
-
-add("Willkommen bei StriveCore AI 👋", "ai");
+async function send(msg=null){
+const text=msg||input.value;input.value="";
+if(!msg)add(text,"user");
+const r=await fetch("/chat",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({message:text})});
+const d=await r.json();
+if(d.announcement)document.getElementById("announcement").textContent="📢 "+d.announcement;
+add(d.reply,"ai");
+if(d.admin){
+adminMenu.style.display="block";
+adminIP.textContent="Deine IP: "+d.ip;
+logs.innerHTML=d.logs.slice(-6).join("<br>");
+warn.innerHTML=d.warnings.map(w=>w.type+" "+w.ip).slice(-6).join("<br>");
+}}
+function admin(s){send(s==="ON"?"__ADMIN_ONLINE__":"__ADMIN_OFFLINE__")}
+function ban(){send(`__ADMIN_BAN__:${banIP.value}:${banH.value}`)}
+function announce(){send(`__ADMIN_ANNOUNCE__:${annMin.value}:${annTxt.value}`)}
+add("Willkommen bei StriveCore AI 👋","ai");
 </script>
 
 </body>
