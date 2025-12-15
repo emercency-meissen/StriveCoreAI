@@ -3,88 +3,166 @@
 <head>
 <meta charset="UTF-8">
 <title>StriveCore AI</title>
+
 <style>
-body { background:#0f0f0f;color:#fff;font-family:sans-serif }
-#adminMenu {
-  display:none;
+body {
+  margin:0;
+  background:#000;
+  color:#fff;
+  font-family:Arial, sans-serif;
+  display:flex;
+  flex-direction:column;
+  height:100vh;
+}
+
+#chat {
+  flex:1;
+  padding:15px;
+  overflow-y:auto;
+  background:#000;
+}
+
+.msg {
+  margin-bottom:10px;
+  padding:10px 12px;
+  border-radius:8px;
+  max-width:80%;
+  word-wrap:break-word;
+}
+
+.user {
+  background:#1e90ff;
+  align-self:flex-end;
+}
+
+.ai {
+  background:#222;
+  border:1px solid #333;
+}
+
+#inputArea {
+  display:flex;
+  padding:10px;
+  background:#111;
+  border-top:1px solid #333;
+}
+
+#input {
+  flex:1;
+  padding:10px;
+  font-size:16px;
+  background:#000;
+  color:#fff;
+  border:1px solid #444;
+  outline:none;
+}
+
+button {
+  margin-left:8px;
+  padding:10px 16px;
+  background:#1e90ff;
+  border:none;
+  color:#fff;
+  cursor:pointer;
+}
+
+button:hover {
+  opacity:0.8;
+}
+
+.adminMenu {
   position:fixed;
   bottom:20px;
   right:20px;
   background:#111;
-  padding:15px;
-  border-radius:15px;
-  width:320px;
+  border:1px solid #444;
+  padding:12px;
+  display:none;
+  width:220px;
 }
-button { margin:5px; padding:6px 10px }
-pre { max-height:120px; overflow:auto; background:#000; padding:5px }
+
+.adminMenu b {
+  display:block;
+  margin-bottom:10px;
+  text-align:center;
+}
+
+.adminMenu input {
+  width:100%;
+  margin-bottom:6px;
+  padding:6px;
+  background:#000;
+  border:1px solid #444;
+  color:#fff;
+}
 </style>
 </head>
+
 <body>
 
-<h1>StriveCore AI</h1>
+<div id="chat"></div>
 
-<input id="msg" placeholder="Nachricht..." style="width:300px">
-<button onclick="send()">Senden</button>
+<div id="inputArea">
+  <input id="input" placeholder="Nachricht eingeben..." onkeydown="if(event.key==='Enter')send()">
+  <button onclick="send()">Senden</button>
+</div>
 
-<pre id="chat"></pre>
+<div class="adminMenu" id="adminMenu">
+  <b>STRIVECORE AI<br>ADMIN MENÜ</b>
 
-<div id="adminMenu">
-<h3>STRIVECORE AI ADMIN MENÜ</h3>
-<button onclick="server('online')">🟢 Online</button>
-<button onclick="server('offline')">🔴 Offline</button>
-<button onclick="logout()">Logout</button>
+  <button onclick="setStatus('online')">🟢 Online</button>
+  <button onclick="setStatus('offline')">🔴 Offline</button>
 
-<h4>👥 Online IPs</h4>
-<pre id="online"></pre>
+  <hr style="border-color:#333">
 
-<h4>🚨 Warnings</h4>
-<pre id="warnings"></pre>
-
-<h4>📜 Logs</h4>
-<pre id="logs"></pre>
+  <input id="banIP" placeholder="IP">
+  <input id="banTime" placeholder="Stunden" type="number">
+  <button onclick="ban()">IP bannen</button>
 </div>
 
 <script>
-async function send(custom){
-  const msg = custom || document.getElementById("msg").value;
-  document.getElementById("msg").value = "";
+const chat = document.getElementById("chat");
+const adminMenu = document.getElementById("adminMenu");
+const input = document.getElementById("input");
 
-  const r = await fetch("/chat",{
+function add(text, cls) {
+  const div = document.createElement("div");
+  div.className = "msg " + cls;
+  div.innerText = text;
+  chat.appendChild(div);
+  chat.scrollTop = chat.scrollHeight;
+}
+
+async function send(msg=null) {
+  const text = msg || input.value.trim();
+  if (!text) return;
+
+  input.value = "";
+  add("DU: " + text, "user");
+
+  const res = await fetch("https://strivecoreai.onrender.com/chat", {
     method:"POST",
     headers:{ "Content-Type":"application/json" },
-    body:JSON.stringify({ message: msg })
+    body:JSON.stringify({ message:text })
   });
 
-  const d = await r.json();
-  document.getElementById("chat").textContent += "\n> " + msg + "\n" + d.reply + "\n";
+  const data = await res.json();
+  add("KI: " + data.reply, "ai");
 
-  if(d.admin){
-    document.getElementById("adminMenu").style.display="block";
-    loadAdmin();
+  if (data.admin === true) {
+    adminMenu.style.display = "block";
   }
 }
 
-async function loadAdmin(){
-  const r = await fetch("/chat",{
-    method:"POST",
-    headers:{ "Content-Type":"application/json" },
-    body:JSON.stringify({ message:"__ADMIN_STATUS__" })
-  });
-  const d = await r.json();
-
-  document.getElementById("online").textContent = d.online.join("\n");
-  document.getElementById("logs").textContent = d.logs.join("\n");
-  document.getElementById("warnings").textContent =
-    d.warnings.map(w=>`${w.ip} | ${w.keyword}\n${w.text}`).join("\n\n");
+function setStatus(s) {
+  send("__ADMIN_SET_STATUS__:" + s);
 }
 
-function server(m){
-  send("__ADMIN_SERVER__:"+m);
-}
-
-function logout(){
-  send("__ADMIN_LOGOUT__");
-  document.getElementById("adminMenu").style.display="none";
+function ban() {
+  const ip = banIP.value;
+  const h = banTime.value;
+  if (!ip || !h) return;
+  send("__ADMIN_BAN__:" + ip + ":" + h);
 }
 </script>
 
