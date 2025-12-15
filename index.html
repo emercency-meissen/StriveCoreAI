@@ -6,68 +6,52 @@
 
 <style>
 body {
-  margin:0;
   background:#000;
   color:#fff;
-  font-family:Arial, sans-serif;
-  display:flex;
-  flex-direction:column;
-  height:100vh;
+  font-family:sans-serif;
+  margin:0;
+}
+
+#header {
+  padding:10px;
+  border-bottom:1px solid #333;
+}
+
+#title {
+  font-size:22px;
+  font-weight:bold;
+}
+
+#emergency {
+  color:#ff4444;
+  font-size:14px;
 }
 
 #chat {
-  flex:1;
-  padding:15px;
-  overflow-y:auto;
-  background:#000;
-}
-
-.msg {
-  margin-bottom:10px;
-  padding:10px 12px;
-  border-radius:8px;
-  max-width:80%;
-  word-wrap:break-word;
-}
-
-.user {
-  background:#1e90ff;
-  align-self:flex-end;
-}
-
-.ai {
-  background:#222;
-  border:1px solid #333;
+  height:75vh;
+  overflow:auto;
+  padding:10px;
 }
 
 #inputArea {
-  display:flex;
   padding:10px;
-  background:#111;
   border-top:1px solid #333;
 }
 
 #input {
-  flex:1;
-  padding:10px;
-  font-size:16px;
+  width:70%;
+  padding:6px;
   background:#000;
   color:#fff;
   border:1px solid #444;
-  outline:none;
 }
 
 button {
-  margin-left:8px;
-  padding:10px 16px;
-  background:#1e90ff;
-  border:none;
+  padding:6px 10px;
+  background:#111;
   color:#fff;
+  border:1px solid #444;
   cursor:pointer;
-}
-
-button:hover {
-  opacity:0.8;
 }
 
 .adminMenu {
@@ -76,47 +60,36 @@ button:hover {
   right:20px;
   background:#111;
   border:1px solid #444;
-  padding:12px;
+  padding:10px;
   display:none;
-  width:220px;
-}
-
-.adminMenu b {
-  display:block;
-  margin-bottom:10px;
-  text-align:center;
-}
-
-.adminMenu input {
-  width:100%;
-  margin-bottom:6px;
-  padding:6px;
-  background:#000;
-  border:1px solid #444;
-  color:#fff;
+  font-size:14px;
 }
 </style>
 </head>
 
 <body>
 
+<div id="header">
+  <div id="title">StriveCore AI</div>
+  <div id="emergency">⚠️ Emergency Mode aktiv – System wird überwacht</div>
+</div>
+
 <div id="chat"></div>
 
 <div id="inputArea">
-  <input id="input" placeholder="Nachricht eingeben..." onkeydown="if(event.key==='Enter')send()">
+  <input id="input" placeholder="Nachricht eingeben">
   <button onclick="send()">Senden</button>
 </div>
 
+<!-- ADMIN MENÜ -->
 <div class="adminMenu" id="adminMenu">
-  <b>STRIVECORE AI<br>ADMIN MENÜ</b>
+  <b>STRIVECORE AI ADMIN MENÜ</b><br><br>
 
   <button onclick="setStatus('online')">🟢 Online</button>
-  <button onclick="setStatus('offline')">🔴 Offline</button>
+  <button onclick="setStatus('offline')">🔴 Offline</button><br><br>
 
-  <hr style="border-color:#333">
-
-  <input id="banIP" placeholder="IP">
-  <input id="banTime" placeholder="Stunden" type="number">
+  <input id="banIP" placeholder="IP"><br>
+  <input id="banTime" type="number" placeholder="Stunden"><br>
   <button onclick="ban()">IP bannen</button>
 </div>
 
@@ -125,20 +98,17 @@ const chat = document.getElementById("chat");
 const adminMenu = document.getElementById("adminMenu");
 const input = document.getElementById("input");
 
-function add(text, cls) {
-  const div = document.createElement("div");
-  div.className = "msg " + cls;
-  div.innerText = text;
-  chat.appendChild(div);
+function add(text) {
+  chat.innerHTML += "<div>" + text + "</div>";
   chat.scrollTop = chat.scrollHeight;
 }
 
 async function send(msg=null) {
-  const text = msg || input.value.trim();
+  const text = msg || input.value;
   if (!text) return;
 
   input.value = "";
-  add("DU: " + text, "user");
+  add("DU: " + text);
 
   const res = await fetch("https://strivecoreai.onrender.com/chat", {
     method:"POST",
@@ -147,7 +117,7 @@ async function send(msg=null) {
   });
 
   const data = await res.json();
-  add("KI: " + data.reply, "ai");
+  add("KI: " + data.reply);
 
   if (data.admin === true) {
     adminMenu.style.display = "block";
