@@ -3,62 +3,163 @@
 <head>
 <meta charset="UTF-8">
 <title>StriveCore AI</title>
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
 <style>
-body{margin:0;background:#0b0b0b;color:#fff;font-family:Arial;display:flex;height:100vh}
-aside{width:240px;background:#111;padding:10px}
-main{flex:1;display:flex;flex-direction:column}
-#chat{flex:1;padding:15px;overflow:auto}
-.msg{margin:8px 0;max-width:80%}
-.user{margin-left:auto;color:#aaa;text-align:right}
-.ai{color:#fff}
-input{width:100%;padding:12px;background:#111;color:#fff;border:1px solid #333}
-#admin{position:fixed;left:20px;top:50%;transform:translateY(-50%);background:#111;border:1px solid #444;padding:10px;display:none;width:260px}
+*{box-sizing:border-box}
+body{
+  margin:0;
+  background:#0b0b0b;
+  color:#fff;
+  font-family:system-ui,-apple-system,BlinkMacSystemFont;
+  height:100vh;
+  display:flex;
+  flex-direction:column;
+}
+
+/* HEADER */
+header{
+  padding:12px;
+  text-align:center;
+  background:#111;
+  border-bottom:1px solid #222;
+  font-weight:600;
+}
+
+/* CHAT */
+#chat{
+  flex:1;
+  padding:12px;
+  overflow-y:auto;
+}
+
+/* MESSAGES */
+.msg{
+  max-width:85%;
+  padding:10px 12px;
+  margin:8px 0;
+  border-radius:14px;
+  font-size:15px;
+  line-height:1.4;
+}
+.user{
+  margin-left:auto;
+  background:#1f1f1f;
+  color:#ccc;
+}
+.ai{
+  background:#111;
+  color:#fff;
+}
+
+/* INPUT */
+#inputBar{
+  display:flex;
+  padding:10px;
+  border-top:1px solid #222;
+  background:#0b0b0b;
+}
+#input{
+  flex:1;
+  padding:12px;
+  border-radius:20px;
+  border:1px solid #333;
+  background:#111;
+  color:#fff;
+  font-size:15px;
+  outline:none;
+}
+#send{
+  margin-left:8px;
+  padding:0 16px;
+  border-radius:20px;
+  border:1px solid #333;
+  background:#222;
+  color:#fff;
+  font-size:14px;
+}
+
+/* ADMIN BOTTOM PANEL */
+#admin{
+  position:fixed;
+  left:0;
+  right:0;
+  bottom:0;
+  background:#111;
+  border-top:1px solid #333;
+  padding:12px;
+  display:none;
+}
+#admin b{display:block;margin-bottom:6px}
+#admin button,#admin input{
+  width:100%;
+  margin:4px 0;
+  padding:8px;
+  background:#222;
+  color:#fff;
+  border:1px solid #333;
+  border-radius:8px;
+}
+#logs{
+  max-height:120px;
+  overflow:auto;
+  font-size:12px;
+  opacity:.8;
+}
 </style>
 </head>
+
 <body>
 
-<aside>
-<b>StriveCore AI</b><br><br>
-<button onclick="newChat()">➕ Neuer Chat</button>
-</aside>
+<header>StriveCore AI</header>
 
-<main>
 <div id="chat"></div>
-<input id="input" placeholder="Stelle irgendeine Frage…" onkeydown="if(event.key==='Enter')send()">
-</main>
 
+<div id="inputBar">
+  <input id="input" placeholder="Stelle eine Frage…" autocomplete="off">
+  <button id="send">➤</button>
+</div>
+
+<!-- ADMIN -->
 <div id="admin">
-<b>ADMIN</b>
-<div id="adminIP"></div>
-<button onclick="server(true)">🟢 Online</button>
-<button onclick="server(false)">🔴 Offline</button>
-<input id="banIP" placeholder="IP">
-<input id="banH" type="number" placeholder="Std">
-<button onclick="ban()">Ban</button>
-<hr>
-<div id="logs"></div>
+  <b>Admin Panel</b>
+  <div id="adminIP"></div>
+  <button onclick="server(true)">🟢 Server Online</button>
+  <button onclick="server(false)">🔴 Server Offline</button>
+  <input id="banIP" placeholder="IP bannen">
+  <input id="banH" type="number" placeholder="Stunden">
+  <button onclick="ban()">Ban</button>
+  <div id="logs"></div>
 </div>
 
 <script>
 const API="https://strivecoreai.onrender.com";
 let chatId="chat-"+Date.now();
 
-function add(t,c){
+const chat=document.getElementById("chat");
+const input=document.getElementById("input");
+
+function add(text,cls){
   const d=document.createElement("div");
-  d.className="msg "+c;
-  d.textContent=t;
+  d.className="msg "+cls;
+  d.textContent=text;
   chat.appendChild(d);
   chat.scrollTop=chat.scrollHeight;
 }
 
 async function send(){
-  const text=input.value;
+  const text=input.value.trim();
+  if(!text)return;
   input.value="";
   add(text,"user");
-  const r=await fetch(API+"/chat",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({message:text,chatId})});
+
+  const r=await fetch(API+"/chat",{
+    method:"POST",
+    headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({message:text,chatId})
+  });
   const d=await r.json();
   add(d.reply,"ai");
+
   if(d.admin){
     admin.style.display="block";
     adminIP.textContent="IP: "+d.ip;
@@ -66,19 +167,25 @@ async function send(){
   }
 }
 
-function newChat(){
-  chat.innerHTML="";
-  add("Willkommen bei StriveCore AI 👋","ai");
-}
+sendBtn=document.getElementById("send");
+sendBtn.onclick=send;
+input.addEventListener("keydown",e=>{
+  if(e.key==="Enter") send();
+});
 
 function server(on){
   fetch(API+"/admin/"+(on?"online":"offline"),{method:"POST"});
 }
 function ban(){
-  fetch(API+"/admin/ban",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({target:banIP.value,hours:banH.value})});
+  fetch(API+"/admin/ban",{
+    method:"POST",
+    headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({target:banIP.value,hours:banH.value})
+  });
 }
 
 add("Willkommen bei StriveCore AI 👋","ai");
 </script>
+
 </body>
 </html>
