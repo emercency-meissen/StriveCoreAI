@@ -1,86 +1,74 @@
 import express from "express";
 import session from "express-session";
 import bcrypt from "bcrypt";
-import { v4 as uuid } from "uuid";
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// ===== Speicher (Demo, später DB) =====
-const users = {};        // username -> {password, premium}
-const chats = {};        // user -> messages
+const users = {}; // username -> {password, premium}
 const admins = new Set();
-const logs = [];
 
-// ===== Middleware =====
 app.use(express.json());
 app.use(express.static("public"));
 app.use(session({
-  secret: "strivecore-secret",
+  secret: "STRIVECORE_AI_SECRET",
   resave: false,
-  saveUninitialized: false
+  saveUninitialized: false,
+  cookie: { httpOnly: true }
 }));
 
-function getIP(req) {
-  return req.headers["x-forwarded-for"]?.split(",")[0] || req.socket.remoteAddress;
+function auth(req, res, next) {
+  if (!req.session.user) return res.status(401).json({ error: "NOT_LOGGED_IN" });
+  next();
 }
 
-// ===== Auth =====
-app.post("/api/register", async (req,res)=>{
-  const {username,password} = req.body;
-  if(users[username]) return res.json({ok:false,msg:"User existiert"});
+// ===== REGISTER =====
+app.post("/api/register", async (req, res) => {
+  const { username, password } = req.body;
+  if (!username || !password) return res.json({ ok:false });
+
+  if (users[username]) return res.json({ ok:false, msg:"EXISTS" });
+
   users[username] = {
-    password: await bcrypt.hash(password,10),
-    premium:false
+    password: await bcrypt.hash(password, 10),
+    premium: false
   };
-  chats[username] = [];
-  res.json({ok:true});
+  res.json({ ok:true });
 });
 
-app.post("/api/login", async (req,res)=>{
-  const {username,password} = req.body;
+// ===== LOGIN =====
+app.post("/api/login", async (req, res) => {
+  const { username, password } = req.body;
   const u = users[username];
-  if(!u || !await bcrypt.compare(password,u.password))
-    return res.json({ok:false});
-  req.session.user = username;
-  res.json({ok:true});
-});
-
-app.post("/api/logout",(req,res)=>{
-  req.session.destroy(()=>res.json({ok:true}));
-});
-
-// ===== Chat =====
-app.post("/chat",(req,res)=>{
-  if(!req.session.user) return res.status(401).end();
-
-  const ip = getIP(req);
-  const msg = req.body.message;
-  const user = req.session.user;
-
-  if(msg === "/admin login 5910783"){
-    admins.add(user);
-    logs.push(`[ADMIN LOGIN] ${user} | ${ip}`);
-    return res.json({reply:"Admin eingeloggt", admin:true, ip, logs});
+  if (!u || !(await bcrypt.compare(password, u.password))) {
+    return res.json({ ok:false });
   }
+  req.session.user = username;
+  res.json({ ok:true, premium:u.premium });
+});
 
-  chats[user].push({from:"user",msg});
-  chats[user].push({from:"ai",msg:"Hallo! Wie kann ich dir helfen?"});
-
+// ===== SESSION CHECK =====
+app.get("/api/me", (req, res) => {
+  if (!req.session.user) return res.json({ logged:false });
+  const u = users[req.session.user];
   res.json({
-    reply:"Hallo! Wie kann ich dir helfen?",
-    admin: admins.has(user),
-    ip,
-    logs
+    logged:true,
+    user:req.session.user,
+    premium:u.premium,
+    admin:admins.has(req.session.user)
   });
 });
 
-// ===== Premium (PLATZHALTER) =====
-app.post("/api/premium",(req,res)=>{
-  if(!req.session.user) return res.status(401).end();
-  // Hier später PayPal Webhook
-  users[req.session.user].premium = true;
-  res.json({ok:true});
+// ===== CHAT =====
+app.post("/chat", auth, (req, res) => {
+  const msg = req.body.message;
+
+  if (msg === "/admin login 5910783") {
+    admins.add(req.session.user);
+    return res.json({ reply:"Admin eingeloggt", admin:true });
+  }
+
+  res.json({ reply:"Hallo! Wie kann ich dir helfen?" });
 });
 
-app.listen(PORT,()=>console.log("StriveCore AI läuft auf",PORT));
+app.listen(PORT, () => console.log("StriveCore AI läuft"));
