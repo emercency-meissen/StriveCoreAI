@@ -2,33 +2,128 @@
 <html lang="de">
 <head>
 <meta charset="UTF-8">
-<title>StriveCoreAI</title>
+<title>StriveCore AI</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<link rel="stylesheet" href="style.css">
+<style>
+body{margin:0;background:#0b0b0b;color:#fff;font-family:Arial;height:100vh}
+#loginOverlay{
+  position:fixed;inset:0;
+  background:#000;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+}
+#loginBox{
+  background:#111;
+  padding:20px;
+  border:1px solid #333;
+  width:260px;
+}
+input,button{
+  width:100%;
+  margin:6px 0;
+  background:#111;
+  color:#fff;
+  border:1px solid #333;
+  padding:8px;
+}
+#chat{padding:10px;height:calc(100vh - 60px);overflow:auto}
+.msg.user{text-align:right;color:#aaa}
+.msg.ai{color:#fff}
+#inputBar{display:flex;padding:10px;border-top:1px solid #333}
+#inputBar input{flex:1}
+#admin{position:fixed;left:20px;top:50%;transform:translateY(-50%);
+background:#111;border:1px solid #444;padding:10px;display:none}
+</style>
 </head>
 <body>
 
-<header>⚡ StriveCoreAI</header>
-
-<main id="chat"></main>
-
-<footer>
-  <textarea id="input" placeholder="Bitte zuerst einloggen…" disabled></textarea>
-  <button id="send" disabled>➤</button>
-</footer>
-
-<!-- LOGIN OVERLAY -->
-<div id="overlay">
-  <div class="loginBox">
-    <h3>Anmelden</h3>
+<!-- LOGIN -->
+<div id="loginOverlay">
+  <div id="loginBox">
+    <h3>StriveCore AI</h3>
     <input id="user" placeholder="Username">
     <input id="pass" type="password" placeholder="Passwort">
     <button onclick="login()">Login</button>
     <button onclick="register()">Registrieren</button>
-    <p id="err"></p>
   </div>
 </div>
 
-<script src="app.js"></script>
+<!-- CHAT -->
+<div id="chat"></div>
+
+<div id="inputBar">
+  <input id="input" placeholder="Nachricht…" onkeydown="if(event.key==='Enter')send()">
+  <button onclick="send()">Senden</button>
+</div>
+
+<!-- ADMIN -->
+<div id="admin">
+  <b>ADMIN MENÜ</b>
+  <div id="adminIP"></div>
+</div>
+
+<script>
+const API = "https://strivecoreai.onrender.com";
+
+/* AUTH */
+async function login(){
+  const r = await fetch(API+"/api/login",{
+    method:"POST",
+    headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({
+      username:user.value,
+      password:pass.value
+    })
+  });
+  const d = await r.json();
+  if(d.ok){
+    loginOverlay.style.display="none";
+    add("Willkommen bei StriveCore AI 👋","ai");
+  } else alert(d.error);
+}
+
+async function register(){
+  const r = await fetch(API+"/api/register",{
+    method:"POST",
+    headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({
+      username:user.value,
+      password:pass.value
+    })
+  });
+  const d = await r.json();
+  alert(d.ok ? "Registriert" : d.error);
+}
+
+/* CHAT */
+function add(t,c){
+  const d=document.createElement("div");
+  d.className="msg "+c;
+  d.textContent=t;
+  chat.appendChild(d);
+  chat.scrollTop=chat.scrollHeight;
+}
+
+async function send(){
+  if(!input.value) return;
+  const text=input.value;
+  input.value="";
+  add(text,"user");
+
+  const r = await fetch(API+"/api/chat",{
+    method:"POST",
+    headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({message:text})
+  });
+  const d = await r.json();
+  add(d.reply,"ai");
+
+  if(d.admin){
+    admin.style.display="block";
+    adminIP.textContent="IP: "+d.ip;
+  }
+}
+</script>
 </body>
 </html>
