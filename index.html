@@ -4,79 +4,38 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>StriveCore AI</title>
-
-<style>
-body{margin:0;background:#0b0b0b;color:#fff;font-family:Arial;display:flex;height:100vh}
-aside{width:240px;background:#111;padding:10px}
-main{flex:1;display:flex;flex-direction:column}
-#chat{flex:1;padding:10px;overflow:auto}
-.msg{margin:6px 0}
-.user{text-align:right;color:#aaa}
-.ai{color:#fff}
-input,button{background:#111;color:#fff;border:1px solid #333}
-.small{font-size:12px;color:#aaa}
-.hidden{display:none}
-@media(max-width:700px){aside{display:none}}
-</style>
+<link rel="stylesheet" href="/style.css">
 </head>
-
 <body>
 
-<aside>
-  <b>StriveCore AI</b>
-  <hr>
-  <div id="account"></div>
-  <button onclick="logout()">Logout</button>
-</aside>
+<div id="loginBox">
+  <h2>Login</h2>
+  <input id="user" placeholder="Username">
+  <input id="pass" type="password" placeholder="Passwort">
+  <button onclick="login()">Login</button>
+  <button onclick="register()">Registrieren</button>
+</div>
 
-<main>
-  <div id="chat"></div>
-  <div style="padding:10px">
-    <input id="input" placeholder="Nachricht…">
-    <button onclick="send()">Senden</button>
-  </div>
-</main>
+<div id="app" hidden>
+  <aside>
+    <b>StriveCore AI</b>
+    <button onclick="newChat()">➕ Neuer Chat</button>
+    <div id="account"></div>
+  </aside>
 
-<script>
-const chat=document.getElementById("chat");
-const account=document.getElementById("account");
+  <main>
+    <div id="chat"></div>
+    <div class="inputBar">
+      <input id="input" placeholder="Nachricht…">
+      <button onclick="send()">Senden</button>
+    </div>
+  </main>
 
-function add(t,c){
-  const d=document.createElement("div");
-  d.className="msg "+c;
-  d.textContent=t;
-  chat.appendChild(d);
-  chat.scrollTop=chat.scrollHeight;
-}
+  <div id="adminMenu"></div>
+</div>
 
-async function checkLogin(){
-  const r=await fetch("/api/me");
-  const d=await r.json();
-  if(!d.logged){
-    location.href="login.html";
-    return;
-  }
-  account.innerHTML = `
-    👤 ${d.user}<br>
-    💎 Premium: ${d.premium?"JA":"NEIN"}
-  `;
-  add("Willkommen bei StriveCore AI 👋","ai");
-}
-
-async function send(){
-  const t=input.value;
-  input.value="";
-  add(t,"user");
-  const r=await fetch("/chat",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({message:t})});
-  const d=await r.json();
-  add(d.reply,"ai");
-}
-
-function logout(){
-  fetch("/api/logout").then(()=>location.reload());
-}
-
-checkLogin();
-</script>
+<script src="/app.js"></script>
+<script src="/auth.js"></script>
+<script src="/admin.js"></script>
 </body>
 </html>
