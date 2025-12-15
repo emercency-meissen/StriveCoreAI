@@ -1,144 +1,68 @@
-import express from "express";
-import cors from "cors";
-import OpenAI from "openai";
+const express = require("express");
+const bodyParser = require("body-parser");
+const path = require("path");
 
 const app = express();
-app.use(cors());
-app.use(express.json());
-
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY
-});
+app.use(bodyParser.json());
+app.use(express.static("public"));
 
 const ADMIN_PASSWORD = "5910783";
 
-/* ====== SERVER STATE ====== */
-let serverStatus = "online";
-const adminIPs = new Set();
-const bannedIPs = {};
+// In-Memory Store (für Demo / free)
+const users = {}; // ip -> { chats: {id: [messages]}, isAdmin }
 const logs = [];
-const warnings = [];
-const announcements = [];
 
-/* ====== CHAT STORAGE ====== */
-const chats = {}; // ip -> { chatId -> messages[] }
-
-/* ====== HELPERS ====== */
 function getIP(req) {
-  return (
-    req.headers["x-forwarded-for"]?.split(",")[0] ||
-    req.socket.remoteAddress ||
-    "unknown"
-  );
+  return req.headers["x-forwarded-for"]?.split(",")[0] || req.socket.remoteAddress;
 }
 
-function log(event, ip) {
-  logs.push(`${new Date().toLocaleTimeString()} | ${event} | ${ip}`);
-}
-
-function checkWarnings(text, ip) {
-  const lower = text.toLowerCase();
-  const map = [
-    { key: "umbringen", type: "SUICIDE" },
-    { key: "bombe", type: "BOMB" },
-    { key: "anschlag", type: "TERROR" },
-    { key: "töten", type: "VIOLENCE" }
-  ];
-  map.forEach(w => {
-    if (lower.includes(w.key)) {
-      warnings.push({ time: Date.now(), type: w.type, ip, text });
-      log(`WARNING ${w.type}`, ip);
-    }
-  });
-}
-
-/* ====== ROUTES ====== */
-app.get("/", (_, res) => {
-  res.send("✅ StriveCore AI Backend läuft");
-});
-
-app.post("/chat", async (req, res) => {
+app.post("/chat", (req, res) => {
   const ip = getIP(req);
-  const { message, chatId = "main" } = req.body;
+  const { message, chatId } = req.body;
 
-  if (bannedIPs[ip] && Date.now() < bannedIPs[ip]) {
-    return res.json({ reply: "🚫 Du bist gesperrt." });
+  if (!users[ip]) {
+    users[ip] = { chats: {}, isAdmin: false };
   }
 
-  /* ADMIN LOGIN */
-  if (message?.startsWith("/admin login")) {
-    const pass = message.split(" ")[2];
-    if (pass === ADMIN_PASSWORD) {
-      adminIPs.add(ip);
-      log("Admin Login", ip);
+  if (!users[ip].chats[chatId]) {
+    users[ip].chats[chatId] = [];
+  }
+
+  // Admin Login
+  if (message.startsWith("/admin login")) {
+    if (message.includes(ADMIN_PASSWORD)) {
+      users[ip].isAdmin = true;
+      logs.push(`ADMIN LOGIN | ${ip}`);
       return res.json({
         reply: "🛡️ Admin eingeloggt",
         admin: true,
         ip,
-        logs,
-        warnings
+        logs
       });
     }
-    return res.json({ reply: "❌ Falsches Passwort" });
   }
 
-  /* ADMIN COMMANDS */
-  if (adminIPs.has(ip)) {
-    if (message === "__ADMIN_ONLINE__") {
-      serverStatus = "online";
-      log("Server ONLINE", ip);
-      return res.json({ reply: "🟢 Server ONLINE", admin: true, ip, logs, warnings });
-    }
-    if (message === "__ADMIN_OFFLINE__") {
-      serverStatus = "offline";
-      log("Server OFFLINE", ip);
-      return res.json({ reply: "🔴 Server OFFLINE", admin: true, ip, logs, warnings });
-    }
-    if (message?.startsWith("__ADMIN_BAN__")) {
-      const [, target, h] = message.split(":");
-      bannedIPs[target] = Date.now() + Number(h) * 3600000;
-      log(`BAN ${target}`, ip);
-      return res.json({ reply: `⛔ ${target} gebannt`, admin: true, ip, logs, warnings });
-    }
-  }
+  // Save User Message
+  users[ip].chats[chatId].push({ role: "user", text: message });
 
-  if (serverStatus === "offline" && !adminIPs.has(ip)) {
-    return res.json({
-      reply: "🚧 STRIVECORE AI HAT AKTUELL SERVER PROBLEME"
-    });
-  }
+  // Fake AI Reply (Platzhalter)
+  const reply = "Ich habe deine Nachricht verstanden: „" + message + "“";
 
-  if (!chats[ip]) chats[ip] = {};
-  if (!chats[ip][chatId]) chats[ip][chatId] = [];
+  users[ip].chats[chatId].push({ role: "ai", text: reply });
 
-  checkWarnings(message, ip);
-
-  chats[ip][chatId].push({ role: "user", content: message });
-
-  try {
-    const completion = await openai.chat.completions.create({
-      model: "gpt-4.1-mini",
-      messages: [
-        { role: "system", content: "Du bist StriveCore AI." },
-        ...chats[ip][chatId]
-      ]
-    });
-
-    const reply = completion.choices[0].message.content;
-    chats[ip][chatId].push({ role: "assistant", content: reply });
-
-    res.json({
-      reply,
-      admin: adminIPs.has(ip),
-      ip,
-      logs,
-      warnings
-    });
-  } catch {
-    res.json({ reply: "⚠️ KI Fehler" });
-  }
+  res.json({
+    reply,
+    admin: users[ip].isAdmin,
+    ip,
+    logs
+  });
 });
 
-app.listen(process.env.PORT || 3000, () =>
-  console.log("🚀 StriveCore AI läuft")
-);
+app.get("/chats", (req, res) => {
+  const ip = getIP(req);
+  if (!users[ip]) return res.json({});
+  res.json(users[ip].chats);
+});
+
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => console.log("StriveCore AI läuft auf Port " + PORT));
