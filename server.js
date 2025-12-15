@@ -12,53 +12,55 @@ const openai = new OpenAI({
 
 const ADMIN_PASSWORD = "5910783";
 
-/* =======================
-   SPEICHER (SERVERWEIT)
-======================= */
-
-const conversations = {}; // ip_chatId -> messages[]
+/* ====== SERVER STATE ====== */
+let serverStatus = "online";
 const adminIPs = new Set();
 const bannedIPs = {};
 const logs = [];
 const warnings = [];
-let announcement = null;
-let serverStatus = "online";
+const announcements = [];
 
-/* =======================
-   HELFER
-======================= */
+/* ====== CHAT STORAGE ====== */
+const chats = {}; // ip -> { chatId -> messages[] }
 
-function log(text) {
-  logs.push(`[${new Date().toLocaleString()}] ${text}`);
+/* ====== HELPERS ====== */
+function getIP(req) {
+  return (
+    req.headers["x-forwarded-for"]?.split(",")[0] ||
+    req.socket.remoteAddress ||
+    "unknown"
+  );
 }
 
-function checkWarning(text, ip) {
-  const t = text.toLowerCase();
-  if (t.includes("umbringen") || t.includes("suizid")) {
-    warnings.push({ type: "SUICIDE", ip, text });
-    log(`⚠️ SUICIDE WARNING von ${ip}`);
-  }
-  if (t.includes("bombe") || t.includes("anschlag")) {
-    warnings.push({ type: "VIOLENCE", ip, text });
-    log(`🚨 VIOLENCE WARNING von ${ip}`);
-  }
+function log(event, ip) {
+  logs.push(`${new Date().toLocaleTimeString()} | ${event} | ${ip}`);
 }
 
-function getConv(key) {
-  if (!conversations[key]) conversations[key] = [];
-  return conversations[key];
+function checkWarnings(text, ip) {
+  const lower = text.toLowerCase();
+  const map = [
+    { key: "umbringen", type: "SUICIDE" },
+    { key: "bombe", type: "BOMB" },
+    { key: "anschlag", type: "TERROR" },
+    { key: "töten", type: "VIOLENCE" }
+  ];
+  map.forEach(w => {
+    if (lower.includes(w.key)) {
+      warnings.push({ time: Date.now(), type: w.type, ip, text });
+      log(`WARNING ${w.type}`, ip);
+    }
+  });
 }
 
-/* =======================
-   ROUTES
-======================= */
+/* ====== ROUTES ====== */
+app.get("/", (_, res) => {
+  res.send("✅ StriveCore AI Backend läuft");
+});
 
 app.post("/chat", async (req, res) => {
-  const ip = req.ip;
+  const ip = getIP(req);
   const { message, chatId = "main" } = req.body;
-  const key = ip + "_" + chatId;
 
-  /* BAN */
   if (bannedIPs[ip] && Date.now() < bannedIPs[ip]) {
     return res.json({ reply: "🚫 Du bist gesperrt." });
   }
@@ -68,81 +70,75 @@ app.post("/chat", async (req, res) => {
     const pass = message.split(" ")[2];
     if (pass === ADMIN_PASSWORD) {
       adminIPs.add(ip);
-      log(`🛡️ Admin Login von ${ip}`);
+      log("Admin Login", ip);
       return res.json({
-        reply: "🛡️ Admin-Modus aktiviert.",
+        reply: "🛡️ Admin eingeloggt",
         admin: true,
         ip,
         logs,
         warnings
       });
     }
-    return res.json({ reply: "❌ Falsches Passwort." });
+    return res.json({ reply: "❌ Falsches Passwort" });
   }
 
-  /* ADMIN AKTIONEN */
+  /* ADMIN COMMANDS */
   if (adminIPs.has(ip)) {
-
     if (message === "__ADMIN_ONLINE__") {
       serverStatus = "online";
-      log(`🟢 Server ONLINE von ${ip}`);
-      return res.json({ reply: "Server ONLINE", admin:true, ip, logs, warnings });
+      log("Server ONLINE", ip);
+      return res.json({ reply: "🟢 Server ONLINE", admin: true, ip, logs, warnings });
     }
-
     if (message === "__ADMIN_OFFLINE__") {
       serverStatus = "offline";
-      log(`🔴 Server OFFLINE von ${ip}`);
-      return res.json({ reply: "Server OFFLINE", admin:true, ip, logs, warnings });
+      log("Server OFFLINE", ip);
+      return res.json({ reply: "🔴 Server OFFLINE", admin: true, ip, logs, warnings });
     }
-
     if (message?.startsWith("__ADMIN_BAN__")) {
-      const [,target,h] = message.split(":");
-      bannedIPs[target] = Date.now() + h*3600000;
-      log(`⛔ IP ${target} gebannt von ${ip}`);
-      return res.json({ reply:`IP ${target} gebannt`, admin:true, ip, logs, warnings });
-    }
-
-    if (message?.startsWith("__ADMIN_ANNOUNCE__")) {
-      const [,min,...txt] = message.split(":");
-      announcement = {
-        text: txt.join(":"),
-        until: Date.now() + min*60000
-      };
-      log(`📢 Announcement von ${ip}`);
-      return res.json({ reply:"📢 Ankündigung gesendet", admin:true, ip, logs, warnings });
+      const [, target, h] = message.split(":");
+      bannedIPs[target] = Date.now() + Number(h) * 3600000;
+      log(`BAN ${target}`, ip);
+      return res.json({ reply: `⛔ ${target} gebannt`, admin: true, ip, logs, warnings });
     }
   }
 
-  /* SERVER OFFLINE */
-  if (serverStatus === "offline") {
-    return res.json({ reply:"🚧 STRIVECORE AI HAT AKTUELL SERVER PROBLEME !" });
+  if (serverStatus === "offline" && !adminIPs.has(ip)) {
+    return res.json({
+      reply: "🚧 STRIVECORE AI HAT AKTUELL SERVER PROBLEME"
+    });
   }
 
-  checkWarning(message, ip);
+  if (!chats[ip]) chats[ip] = {};
+  if (!chats[ip][chatId]) chats[ip][chatId] = [];
 
-  const conv = getConv(key);
-  conv.push({ role:"user", content:message });
+  checkWarnings(message, ip);
+
+  chats[ip][chatId].push({ role: "user", content: message });
 
   try {
-    const ai = await openai.chat.completions.create({
-      model:"gpt-4.1-mini",
-      messages:[
-        { role:"system", content:"Du bist StriveCore AI." },
-        ...conv
+    const completion = await openai.chat.completions.create({
+      model: "gpt-4.1-mini",
+      messages: [
+        { role: "system", content: "Du bist StriveCore AI." },
+        ...chats[ip][chatId]
       ]
     });
 
-    const reply = ai.choices[0].message.content;
-    conv.push({ role:"assistant", content:reply });
+    const reply = completion.choices[0].message.content;
+    chats[ip][chatId].push({ role: "assistant", content: reply });
 
     res.json({
       reply,
-      announcement: announcement && Date.now()<announcement.until ? announcement.text : null
+      admin: adminIPs.has(ip),
+      ip,
+      logs,
+      warnings
     });
-
   } catch {
-    res.json({ reply:"⚠️ KI-Fehler." });
+    res.json({ reply: "⚠️ KI Fehler" });
   }
 });
 
-app.listen(3000, ()=>console.log("🚀 StriveCore AI läuft"));
+app.listen(process.env.PORT || 3000, () =>
+  console.log("🚀 StriveCore AI läuft")
+);
