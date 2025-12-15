@@ -1,144 +1,94 @@
-<!DOCTYPE html>
-<html lang="de">
-<head>
-<meta charset="UTF-8">
-<title>StriveCore AI</title>
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<style>
-body{margin:0;background:#0b0b0b;color:#fff;font-family:Arial;display:flex;height:100vh}
-aside{width:240px;background:#111;padding:10px;overflow:auto}
-main{flex:1;display:flex;flex-direction:column}
-#chat{flex:1;padding:10px;overflow:auto}
-.msg{margin:6px 0}
-.user{text-align:right;color:#aaa}
-.ai{color:#fff}
-input{width:80%;background:#111;color:#fff;border:1px solid #333}
-button{background:#222;color:#fff;border:1px solid #444}
-#adminMenu{position:fixed;bottom:20px;right:20px;background:#111;border:1px solid #444;padding:10px;display:none;width:260px}
-@media(max-width:700px){aside{display:none}}
-</style>
-</head>
-<body>
-
-<aside>
-  <b>StriveCore AI</b><br><br>
-  <button onclick="newChat()">➕ Neuer Chat</button>
-  <div id="chatList"></div>
-</aside>
-
-<main>
-  <div id="chat"></div>
-  <div style="padding:10px">
-    <input id="input" placeholder="Nachricht…">
-    <button onclick="send()">Senden</button>
-  </div>
-</main>
-
-<div id="luxAdmin">
-  <div class="luxHeader">🛡️ ADMIN CONTROL</div>
-
-  <div class="luxSection">
-    <div id="luxIP">IP: -</div>
-    <button onclick="adminCmd('ONLINE')">🟢 ONLINE</button>
-    <button onclick="adminCmd('OFFLINE')">🔴 OFFLINE</button>
-  </div>
-
-  <div class="luxSection">
-    <h4>⚠️ WARNINGS</h4>
-    <div id="luxWarnings"></div>
-  </div>
-
-  <div class="luxSection">
-    <h4>🚫 BAN IP</h4>
-    <input id="luxBanIp" placeholder="IP">
-    <input id="luxBanH" type="number" placeholder="Std">
-    <button onclick="luxBan()">BAN</button>
-  </div>
-
-  <div class="luxSection">
-    <h4>📜 LOGS</h4>
-    <div id="luxLogs"></div>
-  </div>
-
-  <div class="luxSection">
-    <h4>💬 CHAT (WARNING)</h4>
-    <div id="luxChat"></div>
-  </div>
-</div>
-
 <script>
-/* ====== DOM ELEMENTE ====== */
-const chat = document.getElementById("chat");
-const input = document.getElementById("input");
-const adminMenu = document.getElementById("adminMenu");
-const adminIP = document.getElementById("adminIP");
-const logs = document.getElementById("logs");
-const banIP = document.getElementById("banIP");
-const banH = document.getElementById("banH");
+// ===== STABILER CORE =====
+let emergency = false;
 
-/* ====== CONFIG ====== */
-const API = "https://strivecoreai.onrender.com";
-let chatId = "chat-" + Date.now();
+const input = document.getElementById('input');
+const sendBtn = document.getElementById('send');
+const chat = document.getElementById('chat');
+const emergencyBtn = document.getElementById('emergency');
 
-/* ====== CHAT FUNKTIONEN ====== */
-function add(text, cls){
-  const d = document.createElement("div");
-  d.className = "msg " + cls;
-  d.textContent = text;
-  chat.appendChild(d);
+function addMessage(text, type) {
+  const div = document.createElement('div');
+  div.className = 'message ' + type;
+  div.textContent = text;
+  chat.appendChild(div);
   chat.scrollTop = chat.scrollHeight;
 }
 
-async function send(customMsg){
-  const text = customMsg || input.value.trim();
-  if (!text) return;
+function clearChat() {
+  chat.innerHTML = '';
+}
 
-  if (!customMsg) {
-    add(text, "user");
-    input.value = "";
-  }
+function smartReply(text) {
+  const t = text.trim();
+  const tl = t.toLowerCase();
 
-  try {
-    const res = await fetch(API + "/chat", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ message: text, chatId })
-    });
-
-    const data = await res.json();
-    add(data.reply || "⚠️ Keine Antwort", "ai");
-
-    if (data.admin) {
-      adminMenu.style.display = "block";
-      adminIP.textContent = "Deine IP: " + data.ip;
-      logs.innerHTML = (data.logs || []).slice(-5).join("<br>");
+  // 🧮 MATHE (BigInt)
+  const math = tl.match(/^(\d+)\s*([+\-*/])\s*(\d+)$/);
+  if (math) {
+    try {
+      const a = BigInt(math[1]);
+      const b = BigInt(math[3]);
+      const op = math[2];
+      let r;
+      if (op === '+') r = a + b;
+      if (op === '-') r = a - b;
+      if (op === '*') r = a * b;
+      if (op === '/') r = b !== 0n ? a / b : 'Division durch 0';
+      return `🧮 ${a} ${op} ${b} = ${r}`;
+    } catch {
+      return '❌ Mathe-Fehler';
     }
-
-  } catch (e) {
-    add("⚠️ Server nicht erreichbar", "ai");
   }
+
+  if (tl.includes('hallo') || tl.includes('hello'))
+    return '👋 Hallo! Wie kann ich dir helfen?';
+
+  return '🤖 Ich habe dich verstanden.';
 }
 
-function newChat(){
-  chatId = "chat-" + Date.now();
-  chat.innerHTML = "";
-  add("Willkommen bei StriveCore AI 👋", "ai");
+function sendMessage() {
+  if (emergency) return; // 🔴 komplett blockieren, KEINE Meldung
+
+  const text = input.value.trim();
+  if (text === '') return;
+
+  addMessage(text, 'user');
+  input.value = '';
+
+  setTimeout(() => {
+    addMessage(smartReply(text), 'ai');
+  }, 200);
 }
 
-/* ====== ADMIN ====== */
-function admin(type){
-  send(type === "ONLINE" ? "__ADMIN_ONLINE__" : "__ADMIN_OFFLINE__");
-}
+// 🔘 BUTTON → Emergency Stop AN
+emergencyBtn.addEventListener('click', () => {
+  emergency = true;
+  addMessage('🚨 EMERGENCY STOP', 'ai');
+});
 
-function ban(){
-  if (!banIP.value || !banH.value) return;
-  send(`__ADMIN_BAN__:${banIP.value}:${banH.value}`);
-}
+// ✉️ SENDEN
+sendBtn.addEventListener('click', sendMessage);
+input.addEventListener('keydown', e => {
+  if (e.key === 'Enter') {
+    e.preventDefault();
+    sendMessage();
+  }
+});
 
-/* ====== START ====== */
-add("Willkommen bei StriveCore AI 👋", "ai");
+// ⌨️ TASTENKOMBINATIONEN
+window.addEventListener('keydown', e => {
+
+  // 🚨 STRG + V → Emergency Stop AN
+  if (e.ctrlKey && e.key.toLowerCase() === 'v') {
+    emergency = true;
+    addMessage('🚨 EMERGENCY STOP', 'ai');
+  }
+
+  // 🟢 STRG + B → Chat leeren + KI frei
+  if (e.ctrlKey && e.key.toLowerCase() === 'b') {
+    emergency = false;
+    clearChat();
+  }
+});
 </script>
-
-</body>
-</html>
-
