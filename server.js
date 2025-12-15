@@ -1,53 +1,80 @@
 import express from "express";
 import session from "express-session";
 import bcrypt from "bcrypt";
+import path from "path";
+import { fileURLToPath } from "url";
 
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
-app.use(express.json());
+const PORT = process.env.PORT || 3000;
 
+app.use(express.json());
 app.use(session({
   secret: "strivecore_secret",
   resave: false,
   saveUninitialized: false
 }));
 
-const users = {}; // username -> { password }
+/* ===== USERS ===== */
+const users = {};
+const adminIPs = new Set();
 
-/* ===== FILES ===== */
-app.get("/",(_,res)=>res.sendFile(process.cwd()+"/index.html"));
-app.get("/style.css",(_,res)=>res.sendFile(process.cwd()+"/style.css"));
-app.get("/app.js",(_,res)=>res.sendFile(process.cwd()+"/app.js"));
+/* ===== FILE ===== */
+app.get("/", (_, res) =>
+  res.sendFile(path.join(__dirname, "index.html"))
+);
 
-/* ===== AUTH STATUS ===== */
-app.get("/api/me",(req,res)=>{
-  res.json({ logged: !!req.session.user, user: req.session.user });
-});
-
-/* ===== REGISTER ===== */
-app.post("/api/register", async (req,res)=>{
+/* ===== AUTH ===== */
+app.post("/api/register", async (req, res) => {
   const { username, password } = req.body;
-  if(users[username]) return res.json({ error:"Existiert schon" });
-  users[username] = { password: await bcrypt.hash(password,10) };
-  res.json({ ok:true });
+  if (!username || !password)
+    return res.json({ error: "Fehlende Daten" });
+
+  if (users[username])
+    return res.json({ error: "User existiert" });
+
+  users[username] = {
+    password: await bcrypt.hash(password, 10),
+    admin: false
+  };
+
+  res.json({ ok: true });
 });
 
-/* ===== LOGIN ===== */
-app.post("/api/login", async (req,res)=>{
+app.post("/api/login", async (req, res) => {
   const { username, password } = req.body;
   const u = users[username];
-  if(!u || !(await bcrypt.compare(password,u.password))){
-    return res.json({ error:"Falsch" });
-  }
+
+  if (!u || !(await bcrypt.compare(password, u.password)))
+    return res.json({ error: "Login fehlgeschlagen" });
+
   req.session.user = username;
-  res.json({ ok:true });
+  res.json({ ok: true });
 });
 
 /* ===== CHAT ===== */
-app.post("/chat",(req,res)=>{
-  if(!req.session.user){
-    return res.status(401).json({ error:"LOGIN_REQUIRED" });
+app.post("/api/chat", (req, res) => {
+  if (!req.session.user)
+    return res.status(401).json({ reply: "Bitte einloggen." });
+
+  const ip =
+    req.headers["x-forwarded-for"]?.split(",")[0] ||
+    req.socket.remoteAddress;
+
+  const { message } = req.body;
+
+  if (message === "/admin login 5910783") {
+    adminIPs.add(ip);
+    return res.json({ reply: "🛡️ Admin aktiviert", admin: true, ip });
   }
-  res.json({ reply:"Ich bin StriveCoreAI 🤖" });
+
+  res.json({
+    reply: "StriveCore AI: Nachricht empfangen.",
+    admin: adminIPs.has(ip),
+    ip: adminIPs.has(ip) ? ip : null
+  });
 });
 
-app.listen(process.env.PORT||3000,()=>console.log("StriveCoreAI läuft"));
+app.listen(PORT, () =>
+  console.log("🚀 StriveCore AI läuft auf Port", PORT)
+);
