@@ -2,78 +2,27 @@
 <html lang="de">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width,initial-scale=1">
 <title>StriveCore AI</title>
-
 <style>
-body {
-  margin:0;
-  background:#0b0b0b;
-  color:#fff;
-  font-family:Arial;
-  display:flex;
-  height:100vh;
-}
-
-aside {
-  width:240px;
-  background:#111;
-  padding:10px;
-  overflow:auto;
-}
-
-main {
-  flex:1;
-  display:flex;
-  flex-direction:column;
-}
-
-#chat {
-  flex:1;
-  padding:10px;
-  overflow:auto;
-}
-
-.msg { margin:6px 0 }
-.user { text-align:right; color:#aaa }
-.ai { color:#fff }
-
-input {
-  width:80%;
-  background:#111;
-  color:#fff;
-  border:1px solid #333;
-}
-
-button {
-  background:#222;
-  color:#fff;
-  border:1px solid #444;
-}
-
-#adminMenu {
-  position:fixed;
-  bottom:20px;
-  right:20px;
-  background:#111;
-  border:1px solid #444;
-  padding:10px;
-  display:none;
-  width:260px;
-}
-
-@media(max-width:700px){
-  aside{display:none}
-}
+body{margin:0;background:#0b0b0b;color:#fff;font-family:Arial;display:flex;height:100vh}
+aside{width:240px;background:#111;padding:10px}
+main{flex:1;display:flex;flex-direction:column}
+#chat{flex:1;padding:10px;overflow:auto}
+.msg{margin:6px 0}
+.user{text-align:right;color:#aaa}
+.ai{color:#fff}
+input,button{background:#111;color:#fff;border:1px solid #333}
+@media(max-width:700px){aside{display:none}}
 </style>
 </head>
-
 <body>
 
 <aside>
   <b>StriveCore AI</b><br><br>
   <button onclick="newChat()">➕ Neuer Chat</button>
-  <div id="chatList"></div>
+  <hr>
+  <div id="account"></div>
 </aside>
 
 <main>
@@ -84,80 +33,43 @@ button {
   </div>
 </main>
 
-<div id="adminMenu">
-  <b>ADMIN MENÜ</b>
-  <div id="myIP"></div>
-  <hr>
-  <b>Logs</b>
-  <div id="logs" style="font-size:12px"></div>
-</div>
-
 <script>
-let chatId = localStorage.getItem("chatId") || "chat-"+Date.now();
-localStorage.setItem("chatId", chatId);
+let logged=false;
 
-const chat = document.getElementById("chat");
-const chatList = document.getElementById("chatList");
-
-function add(text, cls){
+function add(t,c){
   const d=document.createElement("div");
-  d.className="msg "+cls;
-  d.textContent=text;
+  d.className="msg "+c;
+  d.textContent=t;
   chat.appendChild(d);
   chat.scrollTop=chat.scrollHeight;
 }
 
 async function send(){
-  const text=input.value;
-  input.value="";
-  add(text,"user");
-
-  const res = await fetch("/chat",{
-    method:"POST",
-    headers:{"Content-Type":"application/json"},
-    body:JSON.stringify({message:text,chatId})
-  });
-
-  const data = await res.json();
-  add(data.reply,"ai");
-
-  if(data.admin){
-    adminMenu.style.display="block";
-    myIP.textContent="Deine IP: "+data.ip;
-    logs.innerHTML=(data.logs||[]).slice(-6).join("<br>");
-  }
-}
-
-async function loadChats(){
-  const res = await fetch("/chats");
-  const chats = await res.json();
-  chatList.innerHTML="";
-  Object.keys(chats).forEach(id=>{
-    const b=document.createElement("button");
-    b.textContent=id;
-    b.onclick=()=>openChat(id,chats[id]);
-    chatList.appendChild(b);
-  });
-}
-
-function openChat(id,msgs){
-  chatId=id;
-  localStorage.setItem("chatId",id);
-  chat.innerHTML="";
-  msgs.forEach(m=>add(m.text,m.role==="user"?"user":"ai"));
+  if(!logged) return alert("Bitte einloggen");
+  const t=input.value; input.value="";
+  add(t,"user");
+  const r=await fetch("/chat",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({message:t})});
+  const d=await r.json();
+  add(d.reply,"ai");
 }
 
 function newChat(){
-  chatId="chat-"+Date.now();
-  localStorage.setItem("chatId",chatId);
   chat.innerHTML="";
   add("Willkommen bei StriveCore AI 👋","ai");
-  loadChats();
 }
 
-add("Willkommen bei StriveCore AI 👋","ai");
-loadChats();
+// ===== SIMPLE LOGIN DEMO =====
+(async()=>{
+  const u=prompt("Username");
+  const p=prompt("Passwort");
+  await fetch("/api/register",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({username:u,password:p})});
+  const r=await fetch("/api/login",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({username:u,password:p})});
+  if((await r.json()).ok){
+    logged=true;
+    account.textContent="Angemeldet als "+u;
+    newChat();
+  }
+})();
 </script>
-
 </body>
 </html>
