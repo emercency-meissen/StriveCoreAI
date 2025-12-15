@@ -1,181 +1,92 @@
 <!DOCTYPE html>
 <html lang="de">
 <head>
-  <meta charset="UTF-8" />
-  <title>StriveCore AI</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <style>
-    * { box-sizing: border-box; }
-    body {
-      margin: 0;
-      font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto;
-      background: #000;
-      color: #fff;
-      height: 100vh;
-      display: flex;
-      flex-direction: column;
-    }
-    header {
-      padding: 14px;
-      text-align: center;
-      font-weight: 700;
-      border-bottom: 1px solid #222;
-      position: relative;
-    }
-    #emergency {
-      position: absolute;
-      right: 12px;
-      top: 10px;
-      background: red;
-      color: #fff;
-      border: none;
-      padding: 8px 12px;
-      border-radius: 6px;
-      font-weight: bold;
-      cursor: pointer;
-    }
-    #chat {
-      flex: 1;
-      overflow-y: auto;
-      padding: 16px;
-      display: flex;
-      flex-direction: column;
-      gap: 10px;
-    }
-    .message {
-      max-width: 80%;
-      padding: 12px 14px;
-      border-radius: 14px;
-      line-height: 1.4;
-    }
-    .user { align-self: flex-end; background: #fff; color: #000; }
-    .ai { align-self: flex-start; background: #111; }
-    footer {
-      display: flex;
-      gap: 8px;
-      padding: 10px;
-      border-top: 1px solid #222;
-    }
-    input {
-      flex: 1;
-      padding: 12px;
-      border-radius: 20px;
-      border: 1px solid #444;
-      background: #000;
-      color: #fff;
-    }
-    button {
-      padding: 12px 16px;
-      border-radius: 20px;
-      border: none;
-      background: #fff;
-      color: #000;
-      cursor: pointer;
-    }
-  </style>
+<meta charset="UTF-8">
+<title>StriveCore AI</title>
+<style>
+body { background:#0f0f0f;color:#fff;font-family:sans-serif }
+#adminMenu {
+  display:none;
+  position:fixed;
+  bottom:20px;
+  right:20px;
+  background:#111;
+  padding:15px;
+  border-radius:15px;
+  width:320px;
+}
+button { margin:5px; padding:6px 10px }
+pre { max-height:120px; overflow:auto; background:#000; padding:5px }
+</style>
 </head>
 <body>
 
-<header>
-  StriveCore AI
-  <button id="emergency">EMERGENCY STOP</button>
-</header>
+<h1>StriveCore AI</h1>
 
-<div id="chat">
-  <div class="message ai">
-    Hallo 👋 Ich bin <b>StriveCore AI</b>. Frag mich alles.
-  </div>
+<input id="msg" placeholder="Nachricht..." style="width:300px">
+<button onclick="send()">Senden</button>
+
+<pre id="chat"></pre>
+
+<div id="adminMenu">
+<h3>STRIVECORE AI ADMIN MENÜ</h3>
+<button onclick="server('online')">🟢 Online</button>
+<button onclick="server('offline')">🔴 Offline</button>
+<button onclick="logout()">Logout</button>
+
+<h4>👥 Online IPs</h4>
+<pre id="online"></pre>
+
+<h4>🚨 Warnings</h4>
+<pre id="warnings"></pre>
+
+<h4>📜 Logs</h4>
+<pre id="logs"></pre>
 </div>
 
-<footer>
-  <input id="input" placeholder="Nachricht schreiben…" />
-  <button id="send">Senden</button>
-</footer>
-
 <script>
-let emergency = false;
+async function send(custom){
+  const msg = custom || document.getElementById("msg").value;
+  document.getElementById("msg").value = "";
 
-const chat = document.getElementById("chat");
-const input = document.getElementById("input");
+  const r = await fetch("/chat",{
+    method:"POST",
+    headers:{ "Content-Type":"application/json" },
+    body:JSON.stringify({ message: msg })
+  });
 
-function addMessage(content, type, isImage = false) {
-  const div = document.createElement("div");
-  div.className = "message " + type;
+  const d = await r.json();
+  document.getElementById("chat").textContent += "\n> " + msg + "\n" + d.reply + "\n";
 
-  if (isImage) {
-    const img = document.createElement("img");
-    img.src = content;
-    img.style.maxWidth = "100%";
-    img.style.borderRadius = "12px";
-    div.appendChild(img);
-  } else {
-    div.textContent = content;
-  }
-
-  chat.appendChild(div);
-  chat.scrollTop = chat.scrollHeight;
-}
-
-async function sendMessage() {
-  if (emergency) return;
-
-  const text = input.value.trim();
-  if (!text) return;
-
-  addMessage(text, "user");
-  input.value = "";
-
-  try {
-    const res = await fetch("https://strivecoreai.onrender.com/chat", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-
-      /* ✅ HIER IST DIE EINZIGE ÄNDERUNG */
-      body: JSON.stringify({
-        message: text
-      })
-      /* ✅ SONST NICHTS */
-    });
-
-   const data = await res.json();
-
-if (data.image) {
-  addMessage(data.image, "ai", true);
-} else {
-  addMessage(data.reply, "ai");
-}
-
-  } catch {
-    addMessage("⚠️ Verbindungsfehler zur KI.", "ai");
+  if(d.admin){
+    document.getElementById("adminMenu").style.display="block";
+    loadAdmin();
   }
 }
 
-document.getElementById("send").onclick = sendMessage;
-input.addEventListener("keydown", e => {
-  if (e.key === "Enter") sendMessage();
-});
+async function loadAdmin(){
+  const r = await fetch("/chat",{
+    method:"POST",
+    headers:{ "Content-Type":"application/json" },
+    body:JSON.stringify({ message:"__ADMIN_STATUS__" })
+  });
+  const d = await r.json();
 
-document.getElementById("emergency").onclick = () => {
-  emergency = true;
-  addMessage("🚨 EMERGENCY STOP", "ai");
-};
+  document.getElementById("online").textContent = d.online.join("\n");
+  document.getElementById("logs").textContent = d.logs.join("\n");
+  document.getElementById("warnings").textContent =
+    d.warnings.map(w=>`${w.ip} | ${w.keyword}\n${w.text}`).join("\n\n");
+}
 
-// STRG + H → Emergency AN
-// STRG + B → Reset
-window.addEventListener("keydown", e => {
-  if (e.ctrlKey && e.key.toLowerCase() === "h") {
-    emergency = true;
-    addMessage("🚨 EMERGENCY STOP", "ai");
-  }
-  if (e.ctrlKey && e.key.toLowerCase() === "b") {
-    emergency = false;
-    chat.innerHTML = "";
-  }
-});
+function server(m){
+  send("__ADMIN_SERVER__:"+m);
+}
+
+function logout(){
+  send("__ADMIN_LOGOUT__");
+  document.getElementById("adminMenu").style.display="none";
+}
 </script>
 
 </body>
 </html>
-
-
-
