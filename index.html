@@ -1,94 +1,84 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<title>StriveCore AI</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+body{margin:0;background:#0b0b0b;color:#fff;font-family:Arial;display:flex;height:100vh}
+aside{width:240px;background:#111;padding:10px}
+main{flex:1;display:flex;flex-direction:column}
+#chat{flex:1;padding:15px;overflow:auto}
+.msg{margin:8px 0;max-width:80%}
+.user{margin-left:auto;color:#aaa;text-align:right}
+.ai{color:#fff}
+input{width:100%;padding:12px;background:#111;color:#fff;border:1px solid #333}
+#admin{position:fixed;left:20px;top:50%;transform:translateY(-50%);background:#111;border:1px solid #444;padding:10px;display:none;width:260px}
+</style>
+</head>
+<body>
+
+<aside>
+<b>StriveCore AI</b><br><br>
+<button onclick="newChat()">➕ Neuer Chat</button>
+</aside>
+
+<main>
+<div id="chat"></div>
+<input id="input" placeholder="Stelle irgendeine Frage…" onkeydown="if(event.key==='Enter')send()">
+</main>
+
+<div id="admin">
+<b>ADMIN</b>
+<div id="adminIP"></div>
+<button onclick="server(true)">🟢 Online</button>
+<button onclick="server(false)">🔴 Offline</button>
+<input id="banIP" placeholder="IP">
+<input id="banH" type="number" placeholder="Std">
+<button onclick="ban()">Ban</button>
+<hr>
+<div id="logs"></div>
+</div>
+
 <script>
-// ===== STABILER CORE =====
-let emergency = false;
+const API="https://strivecoreai.onrender.com";
+let chatId="chat-"+Date.now();
 
-const input = document.getElementById('input');
-const sendBtn = document.getElementById('send');
-const chat = document.getElementById('chat');
-const emergencyBtn = document.getElementById('emergency');
-
-function addMessage(text, type) {
-  const div = document.createElement('div');
-  div.className = 'message ' + type;
-  div.textContent = text;
-  chat.appendChild(div);
-  chat.scrollTop = chat.scrollHeight;
+function add(t,c){
+  const d=document.createElement("div");
+  d.className="msg "+c;
+  d.textContent=t;
+  chat.appendChild(d);
+  chat.scrollTop=chat.scrollHeight;
 }
 
-function clearChat() {
-  chat.innerHTML = '';
+async function send(){
+  const text=input.value;
+  input.value="";
+  add(text,"user");
+  const r=await fetch(API+"/chat",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({message:text,chatId})});
+  const d=await r.json();
+  add(d.reply,"ai");
+  if(d.admin){
+    admin.style.display="block";
+    adminIP.textContent="IP: "+d.ip;
+    logs.innerHTML=(d.logs||[]).slice(-5).join("<br>");
+  }
 }
 
-function smartReply(text) {
-  const t = text.trim();
-  const tl = t.toLowerCase();
-
-  // 🧮 MATHE (BigInt)
-  const math = tl.match(/^(\d+)\s*([+\-*/])\s*(\d+)$/);
-  if (math) {
-    try {
-      const a = BigInt(math[1]);
-      const b = BigInt(math[3]);
-      const op = math[2];
-      let r;
-      if (op === '+') r = a + b;
-      if (op === '-') r = a - b;
-      if (op === '*') r = a * b;
-      if (op === '/') r = b !== 0n ? a / b : 'Division durch 0';
-      return `🧮 ${a} ${op} ${b} = ${r}`;
-    } catch {
-      return '❌ Mathe-Fehler';
-    }
-  }
-
-  if (tl.includes('hallo') || tl.includes('hello'))
-    return '👋 Hallo! Wie kann ich dir helfen?';
-
-  return '🤖 Ich habe dich verstanden.';
+function newChat(){
+  chat.innerHTML="";
+  add("Willkommen bei StriveCore AI 👋","ai");
 }
 
-function sendMessage() {
-  if (emergency) return; // 🔴 komplett blockieren, KEINE Meldung
-
-  const text = input.value.trim();
-  if (text === '') return;
-
-  addMessage(text, 'user');
-  input.value = '';
-
-  setTimeout(() => {
-    addMessage(smartReply(text), 'ai');
-  }, 200);
+function server(on){
+  fetch(API+"/admin/"+(on?"online":"offline"),{method:"POST"});
+}
+function ban(){
+  fetch(API+"/admin/ban",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({target:banIP.value,hours:banH.value})});
 }
 
-// 🔘 BUTTON → Emergency Stop AN
-emergencyBtn.addEventListener('click', () => {
-  emergency = true;
-  addMessage('🚨 EMERGENCY STOP', 'ai');
-});
-
-// ✉️ SENDEN
-sendBtn.addEventListener('click', sendMessage);
-input.addEventListener('keydown', e => {
-  if (e.key === 'Enter') {
-    e.preventDefault();
-    sendMessage();
-  }
-});
-
-// ⌨️ TASTENKOMBINATIONEN
-window.addEventListener('keydown', e => {
-
-  // 🚨 STRG + V → Emergency Stop AN
-  if (e.ctrlKey && e.key.toLowerCase() === 'v') {
-    emergency = true;
-    addMessage('🚨 EMERGENCY STOP', 'ai');
-  }
-
-  // 🟢 STRG + B → Chat leeren + KI frei
-  if (e.ctrlKey && e.key.toLowerCase() === 'b') {
-    emergency = false;
-    clearChat();
-  }
-});
+add("Willkommen bei StriveCore AI 👋","ai");
 </script>
+</body>
+</html>
