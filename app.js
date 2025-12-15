@@ -1,8 +1,16 @@
 const chat = document.getElementById("chat");
+const input = document.getElementById("input");
 
-function add(text, cls) {
+input.addEventListener("keydown", e => {
+  if (e.key === "Enter" && !e.shiftKey) {
+    e.preventDefault();
+    send();
+  }
+});
+
+function add(text, type) {
   const d = document.createElement("div");
-  d.className = "msg " + cls;
+  d.className = "msg " + type;
   d.textContent = text;
   chat.appendChild(d);
   chat.scrollTop = chat.scrollHeight;
@@ -12,8 +20,8 @@ async function send() {
   const text = input.value.trim();
   if (!text) return;
 
-  input.value = "";
   add(text, "user");
+  input.value = "";
 
   const r = await fetch("/api/chat", {
     method: "POST",
@@ -27,7 +35,7 @@ async function send() {
 
 function newChat() {
   chat.innerHTML = "";
-  add("Willkommen bei StriveCore AI 👋", "ai");
+  add("Willkommen bei StriveCoreAI 👋", "ai");
 }
 
 newChat();
