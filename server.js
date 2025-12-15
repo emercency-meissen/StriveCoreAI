@@ -18,22 +18,32 @@ const openai = new OpenAI({
 const ADMIN_PASSWORD = "5910783";
 
 /* =========================
-   SPEICHER (IN MEMORY)
+   SPEICHER
 ========================= */
 
 const users = {};
 const conversations = {};
 const bannedIPs = {};
-const adminIPs = new Set();
-const onlineIPs = new Set();
-const adminLogs = [];
-const warningLogs = [];
 
+const onlineIPs = new Set();
+const logs = [];
+const warnings = [];
+
+const adminSessions = {}; // ip -> expiry
 let serverStatus = "online";
 
 /* =========================
    HELFER
 ========================= */
+
+function isAdmin(ip) {
+  if (!adminSessions[ip]) return false;
+  if (Date.now() > adminSessions[ip]) {
+    delete adminSessions[ip];
+    return false;
+  }
+  return true;
+}
 
 function isBanned(ip) {
   if (!bannedIPs[ip]) return false;
@@ -49,12 +59,12 @@ function getConversation(ip) {
   return conversations[ip];
 }
 
-function logAdmin(ip, action) {
-  adminLogs.push({
-    ip,
-    action,
-    time: new Date().toISOString()
-  });
+function checkWarning(text) {
+  const danger = [
+    "umbringen","suizid","töten","bombe",
+    "bank ausrauben","waffe","erschießen"
+  ];
+  return danger.find(w => text.toLowerCase().includes(w));
 }
 
 /* =========================
@@ -73,96 +83,113 @@ app.post("/chat", async (req, res) => {
 
   onlineIPs.add(ip);
 
-  /* ADMIN LOGIN IMMER ERLAUBT */
-  if (message?.startsWith("/admin login")) {
+  if (!message) {
+    return res.json({ reply: "Tut mir leid, ich habe nichts verstanden." });
+  }
+
+  /* -------- ADMIN LOGIN -------- */
+  if (message.startsWith("/admin login")) {
     const pass = message.split(" ")[2];
     if (pass === ADMIN_PASSWORD) {
-      adminIPs.add(ip);
-      logAdmin(ip, "Admin Login");
-      return res.json({ reply: "🛡️ ADMIN LOGIN ERFOLGREICH" });
+      adminSessions[ip] = Date.now() + 60 * 60 * 1000;
+      logs.push(`[ADMIN LOGIN] ${ip}`);
+      return res.json({
+        reply: "🛡️ Admin eingeloggt",
+        admin: true
+      });
     }
     return res.json({ reply: "❌ Falsches Admin Passwort" });
   }
 
-  if (isBanned(ip)) {
-    return res.json({ reply: "🚫 Deine IP ist gesperrt." });
+  /* -------- ADMIN STATUS -------- */
+  if (message === "__ADMIN_STATUS__" && isAdmin(ip)) {
+    return res.json({
+      admin: true,
+      serverStatus,
+      online: Array.from(onlineIPs),
+      logs,
+      warnings
+    });
   }
 
-  /* SERVER OFFLINE – ADMIN DARF IMMER */
-  if (serverStatus === "offline" && !adminIPs.has(ip)) {
+  /* -------- ADMIN SERVER CONTROL -------- */
+  if (message.startsWith("__ADMIN_SERVER__") && isAdmin(ip)) {
+    const mode = message.split(":")[1];
+    serverStatus = mode;
+    logs.push(`[SERVER ${mode.toUpperCase()}] von ${ip}`);
+    return res.json({ reply: `Server ist ${mode}` });
+  }
+
+  /* -------- ADMIN LOGOUT -------- */
+  if (message === "__ADMIN_LOGOUT__" && isAdmin(ip)) {
+    delete adminSessions[ip];
+    logs.push(`[ADMIN LOGOUT] ${ip}`);
+    return res.json({ reply: "👋 Admin ausgeloggt" });
+  }
+
+  /* -------- SERVER OFFLINE (Admins dürfen rein) -------- */
+  if (serverStatus === "offline" && !isAdmin(ip)) {
     return res.json({
       reply: "🚧 STRIVECORE AI HAT AKTUELL SERVER PROBLEME !"
     });
   }
 
-  /* ADMIN ACTIONS (API) */
-  if (adminIPs.has(ip) && message?.startsWith("/admin-action")) {
-    const { action, data } = JSON.parse(message.replace("/admin-action ", ""));
-
-    if (action === "server") {
-      serverStatus = data;
-      logAdmin(ip, `Server ${data}`);
-      return res.json({ reply: `Server ist jetzt ${data}` });
-    }
-
-    if (action === "ban") {
-      bannedIPs[data.ip] = Date.now() + data.hours * 3600000;
-      logAdmin(ip, `IP gebannt: ${data.ip} (${data.hours}h)`);
-      return res.json({ reply: "IP gebannt" });
-    }
+  if (isBanned(ip)) {
+    return res.json({ reply: "🚫 Dein Gerät ist gesperrt." });
   }
 
-  /* WARNING SYSTEM */
-  const dangerWords = ["umbringen", "bank ausrauben", "töten", "sprengen"];
-  if (dangerWords.some(w => message.toLowerCase().includes(w))) {
-    warningLogs.push({
+  /* -------- WARNINGS -------- */
+  const w = checkWarning(message);
+  if (w) {
+    warnings.push({
       ip,
-      message,
+      keyword: w,
+      text: message,
       time: new Date().toISOString()
     });
+    logs.push(`[WARNING] ${ip} → ${w}`);
   }
 
-  /* KI CHAT */
+  /* -------- KI CHAT -------- */
+
   const conversation = getConversation(ip);
   conversation.push({ role: "user", content: message });
 
   try {
     const completion = await openai.chat.completions.create({
       model: "gpt-4.1-mini",
+      temperature: 0.7,
+      max_tokens: 600,
       messages: [
-        { role: "system", content: "Du bist StriveCore AI." },
+        {
+          role: "system",
+          content: `
+Du bist StriveCore AI.
+Antworte wie ChatGPT.
+Wenn du etwas nicht weißt, sage:
+"Tut mir leid, das weiß ich leider nicht."
+`
+        },
         ...conversation
       ]
     });
 
     const reply = completion.choices[0].message.content;
     conversation.push({ role: "assistant", content: reply });
+
     res.json({ reply });
 
-  } catch {
-    res.json({ reply: "⚠️ KI Fehler" });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ reply: "⚠️ Serverfehler bei der KI." });
   }
-});
-
-/* -------- ADMIN DATEN -------- */
-
-app.get("/admin/data", (req, res) => {
-  const ip = req.ip;
-  if (!adminIPs.has(ip)) return res.status(403).end();
-
-  res.json({
-    serverStatus,
-    onlineIPs: [...onlineIPs],
-    bannedIPs,
-    adminLogs,
-    warningLogs
-  });
 });
 
 /* =========================
    START
 ========================= */
 
-app.listen(3000, () => {
-  console.log("🚀 StriveCore AI läuft");
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => {
+  console.log("🚀 StriveCore AI läuft auf Port", PORT);
 });
