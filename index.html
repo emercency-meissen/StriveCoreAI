@@ -89,10 +89,9 @@ async function login(){
   body:JSON.stringify({username:luser.value,password:lpass.value})});
   const d = await r.json();
   if(d.ok){
-    account.textContent = "User: "+luser.value;
-    show("app");
-    newChat();
+  location.reload();
   }
+
 }
 
 async function logout(){
@@ -131,4 +130,5 @@ async function send(){
 </script>
 </body>
 </html>
+
 
