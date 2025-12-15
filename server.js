@@ -1,15 +1,10 @@
 import express from "express";
 import cors from "cors";
-import bcrypt from "bcryptjs";
 import OpenAI from "openai";
 
 const app = express();
 app.use(cors());
 app.use(express.json());
-
-/* =========================
-   KONFIG
-========================= */
 
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY
@@ -17,41 +12,20 @@ const openai = new OpenAI({
 
 const ADMIN_PASSWORD = "5910783";
 
-/* =========================
-   SPEICHER
-========================= */
-
-const users = {};
 const conversations = {};
-const bannedIPs = {};
-
-const onlineIPs = new Set();
-const logs = [];
-const warnings = [];
-
-const adminSessions = {}; // ip -> expiry
+const adminIPs = new Set();
 let serverStatus = "online";
 
-/* =========================
-   HELFER
-========================= */
+/* 🔐 ADMIN LOGS (GLOBAL) */
+const adminLogs = [];
 
-function isAdmin(ip) {
-  if (!adminSessions[ip]) return false;
-  if (Date.now() > adminSessions[ip]) {
-    delete adminSessions[ip];
-    return false;
-  }
-  return true;
-}
-
-function isBanned(ip) {
-  if (!bannedIPs[ip]) return false;
-  if (Date.now() > bannedIPs[ip]) {
-    delete bannedIPs[ip];
-    return false;
-  }
-  return true;
+function addAdminLog(ip, text) {
+  adminLogs.push({
+    time: new Date().toLocaleString(),
+    ip,
+    text
+  });
+  if (adminLogs.length > 200) adminLogs.shift();
 }
 
 function getConversation(ip) {
@@ -59,99 +33,58 @@ function getConversation(ip) {
   return conversations[ip];
 }
 
-function checkWarning(text) {
-  const danger = [
-    "umbringen","suizid","töten","bombe",
-    "bank ausrauben","waffe","erschießen"
-  ];
-  return danger.find(w => text.toLowerCase().includes(w));
-}
-
-/* =========================
-   ROUTES
-========================= */
-
 app.get("/", (req, res) => {
-  res.send("✅ StriveCore AI Backend läuft");
+  res.send("StriveCore AI läuft");
 });
-
-/* -------- CHAT -------- */
 
 app.post("/chat", async (req, res) => {
   const ip = req.ip;
   const { message } = req.body;
 
-  onlineIPs.add(ip);
-
-  if (!message) {
-    return res.json({ reply: "Tut mir leid, ich habe nichts verstanden." });
-  }
-
-  /* -------- ADMIN LOGIN -------- */
-  if (message.startsWith("/admin login")) {
+  /* 🔐 ADMIN LOGIN */
+  if (message?.startsWith("/admin login")) {
     const pass = message.split(" ")[2];
     if (pass === ADMIN_PASSWORD) {
-      adminSessions[ip] = Date.now() + 60 * 60 * 1000;
-      logs.push(`[ADMIN LOGIN] ${ip}`);
+      adminIPs.add(ip);
+      addAdminLog(ip, "Admin eingeloggt");
+
       return res.json({
         reply: "🛡️ Admin eingeloggt",
-        admin: true
+        admin: true,
+        adminIP: ip,
+        logs: adminLogs
       });
     }
-    return res.json({ reply: "❌ Falsches Admin Passwort" });
+    return res.json({ reply: "❌ Falsches Passwort" });
   }
 
-  /* -------- ADMIN STATUS -------- */
-  if (message === "__ADMIN_STATUS__" && isAdmin(ip)) {
-    return res.json({
-      admin: true,
-      serverStatus,
-      online: Array.from(onlineIPs),
-      logs,
-      warnings
-    });
+  /* 🔐 ADMIN ACTIONS */
+  if (adminIPs.has(ip)) {
+
+    if (message?.startsWith("__ADMIN_SET_STATUS__")) {
+      const mode = message.split(":")[1];
+      serverStatus = mode;
+      addAdminLog(ip, `Server → ${mode}`);
+
+      return res.json({
+        reply: `Server ist jetzt ${mode.toUpperCase()}`,
+        logs: adminLogs
+      });
+    }
   }
 
-  /* -------- ADMIN SERVER CONTROL -------- */
-  if (message.startsWith("__ADMIN_SERVER__") && isAdmin(ip)) {
-    const mode = message.split(":")[1];
-    serverStatus = mode;
-    logs.push(`[SERVER ${mode.toUpperCase()}] von ${ip}`);
-    return res.json({ reply: `Server ist ${mode}` });
-  }
-
-  /* -------- ADMIN LOGOUT -------- */
-  if (message === "__ADMIN_LOGOUT__" && isAdmin(ip)) {
-    delete adminSessions[ip];
-    logs.push(`[ADMIN LOGOUT] ${ip}`);
-    return res.json({ reply: "👋 Admin ausgeloggt" });
-  }
-
-  /* -------- SERVER OFFLINE (Admins dürfen rein) -------- */
-  if (serverStatus === "offline" && !isAdmin(ip)) {
+  /* 🚧 SERVER OFFLINE */
+  if (serverStatus === "offline") {
     return res.json({
       reply: "🚧 STRIVECORE AI HAT AKTUELL SERVER PROBLEME !"
     });
   }
 
-  if (isBanned(ip)) {
-    return res.json({ reply: "🚫 Dein Gerät ist gesperrt." });
+  if (!message) {
+    return res.json({ reply: "Ich habe nichts verstanden." });
   }
 
-  /* -------- WARNINGS -------- */
-  const w = checkWarning(message);
-  if (w) {
-    warnings.push({
-      ip,
-      keyword: w,
-      text: message,
-      time: new Date().toISOString()
-    });
-    logs.push(`[WARNING] ${ip} → ${w}`);
-  }
-
-  /* -------- KI CHAT -------- */
-
+  /* 🤖 KI CHAT */
   const conversation = getConversation(ip);
   conversation.push({ role: "user", content: message });
 
@@ -159,16 +92,10 @@ app.post("/chat", async (req, res) => {
     const completion = await openai.chat.completions.create({
       model: "gpt-4.1-mini",
       temperature: 0.7,
-      max_tokens: 600,
       messages: [
         {
           role: "system",
-          content: `
-Du bist StriveCore AI.
-Antworte wie ChatGPT.
-Wenn du etwas nicht weißt, sage:
-"Tut mir leid, das weiß ich leider nicht."
-`
+          content: "Du bist StriveCore AI. Antworte freundlich und hilfreich."
         },
         ...conversation
       ]
@@ -179,17 +106,12 @@ Wenn du etwas nicht weißt, sage:
 
     res.json({ reply });
 
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ reply: "⚠️ Serverfehler bei der KI." });
+  } catch {
+    res.json({ reply: "⚠️ KI Fehler" });
   }
 });
 
-/* =========================
-   START
-========================= */
-
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
-  console.log("🚀 StriveCore AI läuft auf Port", PORT);
-});
+app.listen(PORT, () =>
+  console.log("🚀 StriveCore AI läuft auf Port", PORT)
+);
