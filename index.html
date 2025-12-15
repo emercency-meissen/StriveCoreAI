@@ -2,25 +2,74 @@
 <html lang="de">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width,initial-scale=1">
 <title>StriveCore AI</title>
-<link rel="stylesheet" href="/style.css">
+<style>
+body{margin:0;background:#0b0b0b;color:#fff;font-family:Arial;display:flex;height:100vh}
+aside{width:240px;background:#111;padding:10px}
+main{flex:1;display:flex;flex-direction:column}
+#chat{flex:1;padding:10px;overflow:auto}
+.msg{margin:6px 0}
+.user{text-align:right;color:#aaa}
+.ai{color:#fff}
+input,button{background:#111;color:#fff;border:1px solid #333}
+@media(max-width:700px){aside{display:none}}
+</style>
 </head>
 <body>
 
 <aside>
-  <b>StriveCore AI</b>
+  <b>StriveCore AI</b><br><br>
   <button onclick="newChat()">➕ Neuer Chat</button>
+  <hr>
+  <div id="account"></div>
 </aside>
 
 <main>
   <div id="chat"></div>
-  <div class="inputBar">
+  <div style="padding:10px">
     <input id="input" placeholder="Nachricht…">
     <button onclick="send()">Senden</button>
   </div>
 </main>
 
-<script src="/app.js"></script>
+<script>
+let logged=false;
+
+function add(t,c){
+  const d=document.createElement("div");
+  d.className="msg "+c;
+  d.textContent=t;
+  chat.appendChild(d);
+  chat.scrollTop=chat.scrollHeight;
+}
+
+async function send(){
+  if(!logged) return alert("Bitte einloggen");
+  const t=input.value; input.value="";
+  add(t,"user");
+  const r=await fetch("/chat",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({message:t})});
+  const d=await r.json();
+  add(d.reply,"ai");
+}
+
+function newChat(){
+  chat.innerHTML="";
+  add("Willkommen bei StriveCore AI 👋","ai");
+}
+
+// ===== SIMPLE LOGIN DEMO =====
+(async()=>{
+  const u=prompt("Username");
+  const p=prompt("Passwort");
+  await fetch("/api/register",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({username:u,password:p})});
+  const r=await fetch("/api/login",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({username:u,password:p})});
+  if((await r.json()).ok){
+    logged=true;
+    account.textContent="Angemeldet als "+u;
+    newChat();
+  }
+})();
+</script>
 </body>
 </html>
