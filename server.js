@@ -142,3 +142,36 @@ app.post("/chat", async (req, res) => {
 app.listen(process.env.PORT || 3000, () =>
   console.log("🚀 StriveCore AI läuft")
 );
+const warnings = []; 
+// { type, ip, time, chat }
+function scanWarnings(text, ip, chat) {
+  const t = text.toLowerCase();
+  const rules = [
+    { key: "suizid", type: "SUICIDE" },
+    { key: "umbringen", type: "SUICIDE" },
+    { key: "bombe", type: "BOMB" },
+    { key: "anschlag", type: "TERROR" },
+    { key: "töten", type: "VIOLENCE" }
+  ];
+
+  rules.forEach(r => {
+    if (t.includes(r.key)) {
+      warnings.push({
+        type: r.type,
+        ip,
+        time: new Date().toLocaleTimeString(),
+        chat: [...chat]
+      });
+      log(`WARNING ${r.type}`, ip);
+    }
+  });
+}
+scanWarnings(message, ip, chats[ip][chatId]);
+res.json({
+  reply,
+  admin: adminIPs.has(ip),
+  ip,
+  logs,
+  warnings
+});
+
