@@ -1,68 +1,86 @@
-const express = require("express");
-const bodyParser = require("body-parser");
-const path = require("path");
+import express from "express";
+import session from "express-session";
+import bcrypt from "bcrypt";
+import { v4 as uuid } from "uuid";
 
 const app = express();
-app.use(bodyParser.json());
-app.use(express.static("public"));
+const PORT = process.env.PORT || 3000;
 
-const ADMIN_PASSWORD = "5910783";
-
-// In-Memory Store (für Demo / free)
-const users = {}; // ip -> { chats: {id: [messages]}, isAdmin }
+// ===== Speicher (Demo, später DB) =====
+const users = {};        // username -> {password, premium}
+const chats = {};        // user -> messages
+const admins = new Set();
 const logs = [];
+
+// ===== Middleware =====
+app.use(express.json());
+app.use(express.static("public"));
+app.use(session({
+  secret: "strivecore-secret",
+  resave: false,
+  saveUninitialized: false
+}));
 
 function getIP(req) {
   return req.headers["x-forwarded-for"]?.split(",")[0] || req.socket.remoteAddress;
 }
 
-app.post("/chat", (req, res) => {
+// ===== Auth =====
+app.post("/api/register", async (req,res)=>{
+  const {username,password} = req.body;
+  if(users[username]) return res.json({ok:false,msg:"User existiert"});
+  users[username] = {
+    password: await bcrypt.hash(password,10),
+    premium:false
+  };
+  chats[username] = [];
+  res.json({ok:true});
+});
+
+app.post("/api/login", async (req,res)=>{
+  const {username,password} = req.body;
+  const u = users[username];
+  if(!u || !await bcrypt.compare(password,u.password))
+    return res.json({ok:false});
+  req.session.user = username;
+  res.json({ok:true});
+});
+
+app.post("/api/logout",(req,res)=>{
+  req.session.destroy(()=>res.json({ok:true}));
+});
+
+// ===== Chat =====
+app.post("/chat",(req,res)=>{
+  if(!req.session.user) return res.status(401).end();
+
   const ip = getIP(req);
-  const { message, chatId } = req.body;
+  const msg = req.body.message;
+  const user = req.session.user;
 
-  if (!users[ip]) {
-    users[ip] = { chats: {}, isAdmin: false };
+  if(msg === "/admin login 5910783"){
+    admins.add(user);
+    logs.push(`[ADMIN LOGIN] ${user} | ${ip}`);
+    return res.json({reply:"Admin eingeloggt", admin:true, ip, logs});
   }
 
-  if (!users[ip].chats[chatId]) {
-    users[ip].chats[chatId] = [];
-  }
-
-  // Admin Login
-  if (message.startsWith("/admin login")) {
-    if (message.includes(ADMIN_PASSWORD)) {
-      users[ip].isAdmin = true;
-      logs.push(`ADMIN LOGIN | ${ip}`);
-      return res.json({
-        reply: "🛡️ Admin eingeloggt",
-        admin: true,
-        ip,
-        logs
-      });
-    }
-  }
-
-  // Save User Message
-  users[ip].chats[chatId].push({ role: "user", text: message });
-
-  // Fake AI Reply (Platzhalter)
-  const reply = "Ich habe deine Nachricht verstanden: „" + message + "“";
-
-  users[ip].chats[chatId].push({ role: "ai", text: reply });
+  chats[user].push({from:"user",msg});
+  chats[user].push({from:"ai",msg:"Hallo! Wie kann ich dir helfen?"});
 
   res.json({
-    reply,
-    admin: users[ip].isAdmin,
+    reply:"Hallo! Wie kann ich dir helfen?",
+    admin: admins.has(user),
     ip,
     logs
   });
 });
 
-app.get("/chats", (req, res) => {
-  const ip = getIP(req);
-  if (!users[ip]) return res.json({});
-  res.json(users[ip].chats);
+// ===== Premium (PLATZHALTER) =====
+app.post("/api/premium",(req,res)=>{
+  if(!req.session.user) return res.status(401).end();
+  // Hier später PayPal Webhook
+  users[req.session.user].premium = true;
+  res.json({ok:true});
 });
 
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log("StriveCore AI läuft auf Port " + PORT));
+app.listen(PORT,()=>console.log("StriveCore AI läuft auf",PORT));
