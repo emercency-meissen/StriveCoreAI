@@ -1,29 +1,35 @@
+const luxAdmin = document.getElementById("luxAdmin");
+const adminIP = document.getElementById("adminIP");
+const adminLogs = document.getElementById("adminLogs");
+const adminWarnings = document.getElementById("adminWarnings");
+
+luxAdmin.style.display = "none";
+
 function showAdmin(data){
-  luxAdmin.style.display="block";
-  luxIP.textContent="IP: "+data.ip;
+  luxAdmin.style.display = "block";
+  adminIP.textContent = "Deine IP: " + data.ip;
 
-  luxLogs.innerHTML=(data.logs||[])
-    .slice(-10)
-    .map(l=>"<div>"+l+"</div>")
-    .join("");
-
-  luxWarnings.innerHTML="";
-  (data.warnings||[]).forEach((w,i)=>{
+  adminLogs.innerHTML = "";
+  (data.logs || []).slice(-10).forEach(l=>{
     const d=document.createElement("div");
-    d.textContent=`[${w.type}] ${w.ip}`;
-    d.onclick=()=>showWarningChat(w.chat);
-    luxWarnings.appendChild(d);
+    d.className="adminLog";
+    d.textContent=l;
+    adminLogs.appendChild(d);
+  });
+
+  adminWarnings.innerHTML = "";
+  (data.warnings || []).slice(-10).forEach(w=>{
+    const d=document.createElement("div");
+    d.className="adminLog";
+    d.textContent=`⚠️ ${w.type} | ${w.ip}`;
+    adminWarnings.appendChild(d);
   });
 }
 
-function showWarningChat(chat){
-  luxChat.innerHTML=chat.map(m=>`${m.role}: ${m.content}`).join("\n");
+function adminCmd(type){
+  send(type==="ONLINE"?"__ADMIN_ONLINE__":"__ADMIN_OFFLINE__");
 }
 
-function adminCmd(t){
-  send(t==="ONLINE"?"__ADMIN_ONLINE__":"__ADMIN_OFFLINE__");
-}
-
-function luxBan(){
-  send(`__ADMIN_BAN__:${luxBanIp.value}:${luxBanH.value}`);
+function banIP(){
+  send(`__ADMIN_BAN__:${banIP.value}:${banH.value}`);
 }
