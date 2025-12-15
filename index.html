@@ -2,17 +2,19 @@
 <html lang="de">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
 <title>StriveCore AI</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <style>
 body{margin:0;background:#0b0b0b;color:#fff;font-family:Arial;display:flex;height:100vh}
-aside{width:240px;background:#111;padding:10px}
+aside{width:240px;background:#111;padding:10px;overflow:auto}
 main{flex:1;display:flex;flex-direction:column}
 #chat{flex:1;padding:10px;overflow:auto}
 .msg{margin:6px 0}
 .user{text-align:right;color:#aaa}
 .ai{color:#fff}
-input,button{background:#111;color:#fff;border:1px solid #333}
+input{width:80%;background:#111;color:#fff;border:1px solid #333}
+button{background:#222;color:#fff;border:1px solid #444}
+#adminMenu{position:fixed;bottom:20px;right:20px;background:#111;border:1px solid #444;padding:10px;display:none;width:260px}
 @media(max-width:700px){aside{display:none}}
 </style>
 </head>
@@ -21,8 +23,7 @@ input,button{background:#111;color:#fff;border:1px solid #333}
 <aside>
   <b>StriveCore AI</b><br><br>
   <button onclick="newChat()">➕ Neuer Chat</button>
-  <hr>
-  <div id="account"></div>
+  <div id="chatList"></div>
 </aside>
 
 <main>
@@ -33,43 +34,91 @@ input,button{background:#111;color:#fff;border:1px solid #333}
   </div>
 </main>
 
-<script>
-let logged=false;
+<div id="adminMenu">
+  <b>ADMIN MENÜ</b>
+  <div id="adminIP"></div>
+  <button onclick="admin('ONLINE')">🟢 Online</button>
+  <button onclick="admin('OFFLINE')">🔴 Offline</button>
+  <input id="banIP" placeholder="IP">
+  <input id="banH" type="number" placeholder="Std">
+  <button onclick="ban()">Ban</button>
+  <hr>
+  <b>Logs</b>
+  <div id="logs" style="font-size:12px;color:#aaa"></div>
+</div>
 
-function add(t,c){
-  const d=document.createElement("div");
-  d.className="msg "+c;
-  d.textContent=t;
+<script>
+/* ====== DOM ELEMENTE ====== */
+const chat = document.getElementById("chat");
+const input = document.getElementById("input");
+const adminMenu = document.getElementById("adminMenu");
+const adminIP = document.getElementById("adminIP");
+const logs = document.getElementById("logs");
+const banIP = document.getElementById("banIP");
+const banH = document.getElementById("banH");
+
+/* ====== CONFIG ====== */
+const API = "https://strivecoreai.onrender.com";
+let chatId = "chat-" + Date.now();
+
+/* ====== CHAT FUNKTIONEN ====== */
+function add(text, cls){
+  const d = document.createElement("div");
+  d.className = "msg " + cls;
+  d.textContent = text;
   chat.appendChild(d);
-  chat.scrollTop=chat.scrollHeight;
+  chat.scrollTop = chat.scrollHeight;
 }
 
-async function send(){
-  if(!logged) return alert("Bitte einloggen");
-  const t=input.value; input.value="";
-  add(t,"user");
-  const r=await fetch("/chat",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({message:t})});
-  const d=await r.json();
-  add(d.reply,"ai");
+async function send(customMsg){
+  const text = customMsg || input.value.trim();
+  if (!text) return;
+
+  if (!customMsg) {
+    add(text, "user");
+    input.value = "";
+  }
+
+  try {
+    const res = await fetch(API + "/chat", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ message: text, chatId })
+    });
+
+    const data = await res.json();
+    add(data.reply || "⚠️ Keine Antwort", "ai");
+
+    if (data.admin) {
+      adminMenu.style.display = "block";
+      adminIP.textContent = "Deine IP: " + data.ip;
+      logs.innerHTML = (data.logs || []).slice(-5).join("<br>");
+    }
+
+  } catch (e) {
+    add("⚠️ Server nicht erreichbar", "ai");
+  }
 }
 
 function newChat(){
-  chat.innerHTML="";
-  add("Willkommen bei StriveCore AI 👋","ai");
+  chatId = "chat-" + Date.now();
+  chat.innerHTML = "";
+  add("Willkommen bei StriveCore AI 👋", "ai");
 }
 
-// ===== SIMPLE LOGIN DEMO =====
-(async()=>{
-  const u=prompt("Username");
-  const p=prompt("Passwort");
-  await fetch("/api/register",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({username:u,password:p})});
-  const r=await fetch("/api/login",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({username:u,password:p})});
-  if((await r.json()).ok){
-    logged=true;
-    account.textContent="Angemeldet als "+u;
-    newChat();
-  }
-})();
+/* ====== ADMIN ====== */
+function admin(type){
+  send(type === "ONLINE" ? "__ADMIN_ONLINE__" : "__ADMIN_OFFLINE__");
+}
+
+function ban(){
+  if (!banIP.value || !banH.value) return;
+  send(`__ADMIN_BAN__:${banIP.value}:${banH.value}`);
+}
+
+/* ====== START ====== */
+add("Willkommen bei StriveCore AI 👋", "ai");
 </script>
+
 </body>
 </html>
