@@ -84,3 +84,16 @@ app.post("/api/chat", (req, res) => {
 app.listen(PORT, () => {
   console.log("StriveCore AI läuft auf Port", PORT);
 });
+
+app.get("/api/me", (req, res) => {
+  if (!req.session.user) {
+    return res.json({ loggedIn: false });
+  }
+
+  res.json({
+    loggedIn: true,
+    user: req.session.user,
+    admin: ADMIN_USERS.includes(req.session.user)
+  });
+});
+
