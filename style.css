@@ -1,68 +1,65 @@
-#luxAdmin{
-  position:fixed;
-  left:20px;
-  top:50%;
-  transform:translateY(-50%);
-  width:320px;
-  max-height:80vh;
+body{
+  margin:0;
   background:#0f0f0f;
-  border:1px solid #333;
-  border-radius:14px;
+  color:#fff;
+  font-family:system-ui;
+  display:flex;
+  height:100vh
+}
+
+aside{
+  width:240px;
+  background:#111;
+  padding:12px
+}
+
+main{
+  flex:1;
+  display:flex;
+  flex-direction:column
+}
+
+#chat{
+  flex:1;
+  padding:20px;
+  overflow:auto
+}
+
+.msg{
+  max-width:75%;
   padding:12px;
-  display:none;
-  z-index:9999;
-  overflow:auto;
-  box-shadow:0 0 20px rgba(0,0,0,.6);
-}
-
-.luxHeader{
-  font-weight:bold;
-  font-size:16px;
   margin-bottom:10px;
-  text-align:center;
+  border-radius:12px
 }
 
-.luxSection{
-  margin-bottom:12px;
-  border-top:1px solid #222;
-  padding-top:8px;
+.user{margin-left:auto;background:#2d2d2d}
+.ai{background:#1c1c1c}
+
+#inputBar{
+  padding:12px;
+  border-top:1px solid #333;
+  display:flex
 }
 
-#luxAdmin button{
-  width:100%;
-  margin-top:6px;
-  background:#1a1a1a;
-  border:1px solid #444;
-  color:#fff;
-  border-radius:8px;
-  padding:6px;
-}
-
-#luxAdmin input{
-  width:100%;
-  margin-top:6px;
-  background:#111;
-  border:1px solid #333;
-  color:#fff;
-  border-radius:6px;
-  padding:5px;
-}
-
-#luxWarnings div{
-  cursor:pointer;
-  padding:4px;
-  border-bottom:1px solid #222;
-  font-size:13px;
-}
-
-#luxWarnings div:hover{
+textarea{
+  flex:1;
   background:#222;
+  border:none;
+  color:#fff;
+  padding:10px;
+  resize:none
 }
 
-#luxChat{
-  font-size:12px;
-  white-space:pre-wrap;
-  background:#111;
-  padding:6px;
-  border-radius:6px;
+button{
+  background:none;
+  border:none;
+  color:white;
+  font-size:18px
+}
+
+#loginBox{
+  margin:auto;
+  display:flex;
+  flex-direction:column;
+  gap:10px
 }
