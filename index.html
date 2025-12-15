@@ -5,92 +5,119 @@
 <title>StriveCore AI</title>
 
 <style>
-body { background:#000; color:#fff; font-family:sans-serif; }
-#chat { height:80vh; overflow:auto; }
-
-.header {
-  margin-bottom:10px;
+body {
+  background:#000;
+  color:#fff;
+  font-family: Arial, sans-serif;
+  margin:0;
 }
 
-.warning {
-  color:#ffcc00;
-  font-size:14px;
-}
-
-.adminMenu {
-  position:fixed;
-  bottom:20px;
-  right:20px;
-  background:#111;
-  border:1px solid #444;
+header {
   padding:10px;
-  display:none;
-  width:260px;
+  border-bottom:1px solid #333;
 }
 
-.adminLogs {
-  margin-top:10px;
+#chat {
+  height:70vh;
+  overflow-y:auto;
+  padding:10px;
+}
+
+.msg-user { color:#0f0; margin:5px 0; }
+.msg-ai { color:#0af; margin:5px 0; }
+
+#inputBar {
+  display:flex;
+  padding:10px;
+  border-top:1px solid #333;
+}
+
+#input {
+  flex:1;
+  padding:8px;
+  background:#111;
+  color:#fff;
+  border:1px solid #333;
+}
+
+button {
+  background:#222;
+  color:#fff;
+  border:1px solid #444;
+  padding:8px 12px;
+  cursor:pointer;
+}
+
+/* 🔐 ADMIN MENU */
+#adminMenu {
+  position:fixed;
+  right:15px;
+  bottom:15px;
+  background:#111;
+  border:1px solid #555;
+  padding:10px;
+  width:260px;
+  display:none;
+}
+
+#logs {
   background:#000;
   border:1px solid #333;
-  padding:5px;
-  height:100px;
+  height:120px;
   overflow:auto;
   font-size:12px;
+  padding:5px;
 }
-
-button { margin:4px; }
 </style>
 </head>
 
 <body>
 
-<div class="header">
+<header>
   <h2>StriveCore AI</h2>
-  <div class="warning">⚠️ Emergency Mode aktiv – System wird überwacht</div>
-</div>
+  <div>⚠️ Emergency Mode aktiv – System wird überwacht</div>
+</header>
 
 <div id="chat"></div>
 
-<input id="input">
-<button onclick="send()">Senden</button>
+<div id="inputBar">
+  <input id="input" placeholder="Nachricht eingeben..." onkeydown="if(event.key==='Enter')send()">
+  <button onclick="send()">Senden</button>
+</div>
 
-<!-- ADMIN MENÜ -->
-<div class="adminMenu" id="adminMenu">
-  <b>STRIVECORE AI ADMIN MENÜ</b><br><br>
+<!-- 🔐 ADMIN -->
+<div id="adminMenu">
+  <b>STRIVECORE AI ADMIN MENÜ</b><br>
+  <div id="adminIP"></div><br>
 
   <button onclick="setStatus('online')">🟢 Online</button>
-  <button onclick="setStatus('offline')">🔴 Offline</button><br><br>
+  <button onclick="setStatus('offline')">🔴 Offline</button>
 
-  <input id="banIP" placeholder="IP">
-  <input id="banTime" placeholder="Std" type="number">
-  <button onclick="ban()">Ban</button>
-
-  <div class="adminLogs" id="adminLogs">
-    <b>Logs:</b><br>
-  </div>
+  <hr>
+  <b>Logs</b>
+  <div id="logs"></div>
 </div>
 
 <script>
 const chat = document.getElementById("chat");
+const input = document.getElementById("input");
 const adminMenu = document.getElementById("adminMenu");
-const adminLogs = document.getElementById("adminLogs");
+const logsBox = document.getElementById("logs");
 
-function add(text) {
-  chat.innerHTML += "<div>" + text + "</div>";
+function add(text, cls) {
+  const d = document.createElement("div");
+  d.className = cls;
+  d.innerText = text;
+  chat.appendChild(d);
   chat.scrollTop = chat.scrollHeight;
 }
 
-function log(text) {
-  adminLogs.innerHTML += text + "<br>";
-  adminLogs.scrollTop = adminLogs.scrollHeight;
-}
-
-async function send(msg=null) {
-  const text = msg || input.value;
-  input.value = "";
+async function send(custom=null) {
+  const text = custom || input.value;
   if (!text) return;
+  input.value = "";
 
-  add("DU: " + text);
+  add("DU: " + text, "msg-user");
 
   const res = await fetch("https://strivecoreai.onrender.com/chat", {
     method:"POST",
@@ -99,29 +126,24 @@ async function send(msg=null) {
   });
 
   const data = await res.json();
-  add("KI: " + data.reply);
+  add("KI: " + data.reply, "msg-ai");
 
-  if (data.admin === true) {
+  if (data.admin) {
     adminMenu.style.display = "block";
-    log("Admin eingeloggt");
+    document.getElementById("adminIP").innerText =
+      "Deine Admin-IP: " + data.adminIP;
   }
 
-  if (data.log) {
-    log(data.log);
+  if (data.logs) {
+    logsBox.innerHTML = "";
+    data.logs.forEach(l =>
+      logsBox.innerHTML += `[${l.time}] ${l.ip}: ${l.text}<br>`
+    );
   }
 }
 
 function setStatus(s) {
-  log("Server -> " + s);
   send("__ADMIN_SET_STATUS__:" + s);
-}
-
-function ban() {
-  const ip = banIP.value;
-  const h = banTime.value;
-  if (!ip || !h) return;
-  log("Ban IP " + ip + " für " + h + "h");
-  send("__ADMIN_BAN__:" + ip + ":" + h);
 }
 </script>
 
