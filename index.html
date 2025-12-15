@@ -4,32 +4,77 @@
 <meta charset="UTF-8">
 <title>StriveCore AI</title>
 <style>
-body{margin:0;background:#000;color:#fff;font-family:Arial}
+body{margin:0;background:#000;color:#fff;font-family:Arial;display:flex;height:100vh}
+
+/* SIDEBAR */
+#sidebar{
+  width:260px;
+  background:#0b0b0b;
+  border-right:1px solid #333;
+  padding:10px;
+}
+#newChat{
+  width:100%;
+  margin-bottom:10px;
+}
+.chatItem{
+  padding:8px;
+  border:1px solid #222;
+  margin-bottom:6px;
+  cursor:pointer;
+}
+.chatItem:hover{background:#111}
+
+/* MAIN */
+#main{flex:1;display:flex;flex-direction:column}
 header{padding:10px;border-bottom:1px solid #333}
-#chat{height:70vh;overflow:auto;padding:10px}
+#announcement{padding:6px;color:#f5c542;font-size:13px}
+#chat{flex:1;overflow:auto;padding:10px}
 .msg{margin:6px 0}
 .user{text-align:right;color:#aaa}
 .ai{color:#fff}
-#adminMenu{position:fixed;bottom:20px;right:20px;background:#111;
-border:1px solid #444;padding:10px;width:260px;display:none}
+#inputBar{padding:10px;border-top:1px solid #333}
+input{width:80%;background:#111;color:#fff;border:1px solid #333}
+button{background:#222;color:#fff;border:1px solid #444}
+
+/* ADMIN */
+#adminMenu{
+  position:fixed;bottom:20px;right:20px;
+  background:#111;border:1px solid #444;
+  padding:10px;width:260px;display:none
+}
 .small{font-size:12px;color:#aaa}
 </style>
 </head>
+
 <body>
 
-<header>
-<h2>StriveCore AI</h2>
-<div class="small">⚠️ Emergency Mode aktiv – System wird überwacht</div>
-</header>
-
-<div id="announcement" class="small"></div>
-<div id="chat"></div>
-
-<div style="padding:10px">
-<input id="input" placeholder="Nachricht…" style="width:80%">
-<button onclick="send()">Senden</button>
+<!-- SIDEBAR -->
+<div id="sidebar">
+  <button id="newChat" onclick="newChat()">➕ Neuer Chat</button>
+  <div id="chatList"></div>
+  <hr>
+  <div class="small">Account: IP-User</div>
+  <div class="small">Premium: ❌</div>
 </div>
 
+<!-- MAIN -->
+<div id="main">
+<header>
+  <h2>StriveCore AI</h2>
+  <div class="small">⚠️ Emergency Mode aktiv – System wird überwacht</div>
+</header>
+
+<div id="announcement"></div>
+<div id="chat"></div>
+
+<div id="inputBar">
+  <input id="input" placeholder="Nachricht…">
+  <button onclick="send()">Senden</button>
+</div>
+</div>
+
+<!-- ADMIN -->
 <div id="adminMenu">
 <b>STRIVECORE AI ADMIN MENÜ</b>
 <div id="adminIP" class="small"></div>
@@ -50,26 +95,75 @@ border:1px solid #444;padding:10px;width:260px;display:none}
 </div>
 
 <script>
-const chat=document.getElementById("chat");
-function add(t,c){const d=document.createElement("div");d.className="msg "+c;d.textContent=t;chat.appendChild(d);chat.scrollTop=chat.scrollHeight;}
+let chats = [];
+let chatId = null;
 
-async function send(msg=null){
-const text=msg||input.value;input.value="";
-if(!msg)add(text,"user");
-const r=await fetch("/chat",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({message:text})});
-const d=await r.json();
-if(d.announcement)document.getElementById("announcement").textContent="📢 "+d.announcement;
-add(d.reply,"ai");
-if(d.admin){
-adminMenu.style.display="block";
-adminIP.textContent="Deine IP: "+d.ip;
-logs.innerHTML=d.logs.slice(-6).join("<br>");
-warn.innerHTML=d.warnings.map(w=>w.type+" "+w.ip).slice(-6).join("<br>");
-}}
+const chatBox = document.getElementById("chat");
+const chatList = document.getElementById("chatList");
+
+function add(text,cls){
+  const d=document.createElement("div");
+  d.className="msg "+cls;
+  d.textContent=text;
+  chatBox.appendChild(d);
+  chatBox.scrollTop=chatBox.scrollHeight;
+}
+
+function renderChats(){
+  chatList.innerHTML="";
+  chats.forEach(c=>{
+    const d=document.createElement("div");
+    d.className="chatItem";
+    d.textContent=c.title;
+    d.onclick=()=>loadChat(c.id);
+    chatList.appendChild(d);
+  });
+}
+
+function newChat(){
+  chatId="chat_"+Date.now();
+  chats.push({id:chatId,title:"Neuer Chat"});
+  renderChats();
+  chatBox.innerHTML="";
+  add("Willkommen bei StriveCore AI 👋","ai");
+}
+
+function loadChat(id){
+  chatId=id;
+  chatBox.innerHTML="";
+  add("Chat geladen.","ai");
+}
+
+async function send(custom=null){
+  const text=custom||input.value;
+  input.value="";
+  if(!custom)add(text,"user");
+
+  const r=await fetch("/chat",{
+    method:"POST",
+    headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({message:text,chatId})
+  });
+  const d=await r.json();
+
+  if(d.announcement)
+    document.getElementById("announcement").textContent="📢 "+d.announcement;
+
+  add(d.reply,"ai");
+
+  if(d.admin){
+    adminMenu.style.display="block";
+    adminIP.textContent="Deine IP: "+d.ip;
+    logs.innerHTML=d.logs.slice(-6).join("<br>");
+    warn.innerHTML=d.warnings.slice(-6).map(w=>w.type+" "+w.ip).join("<br>");
+  }
+}
+
 function admin(s){send(s==="ON"?"__ADMIN_ONLINE__":"__ADMIN_OFFLINE__")}
 function ban(){send(`__ADMIN_BAN__:${banIP.value}:${banH.value}`)}
 function announce(){send(`__ADMIN_ANNOUNCE__:${annMin.value}:${annTxt.value}`)}
-add("Willkommen bei StriveCore AI 👋","ai");
+
+newChat();
 </script>
 
 </body>
