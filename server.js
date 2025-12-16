@@ -5,16 +5,28 @@ import path from "path";
 import { fileURLToPath } from "url";
 import fs from "fs";
 
+/* ===== FIX __dirname ===== */
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+/* ===== APP ===== */
+const app = express();
+app.use(cors());
+app.use(express.json());
+
+/* ===== FILE ===== */
 const videosFile = path.join(__dirname, "videos.json");
 
 function readVideos(){
   if(!fs.existsSync(videosFile)) return [];
   return JSON.parse(fs.readFileSync(videosFile));
 }
+
 function saveVideos(v){
   fs.writeFileSync(videosFile, JSON.stringify(v,null,2));
 }
 
+/* ===== VIDEOS API ===== */
 app.get("/videos",(req,res)=>{
   res.json(readVideos());
 });
@@ -27,13 +39,7 @@ app.post("/videos/like/:id",(req,res)=>{
   res.json({ok:true});
 });
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
-
-const app = express();
-app.use(cors());
-app.use(express.json());
-
+/* ===== OPENAI ===== */
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY
 });
@@ -66,7 +72,7 @@ function scan(text, ipAddr) {
   }
 }
 
-/* ===== PAGE ROUTES ===== */
+/* ===== PAGES ===== */
 app.get("/", (req, res) => {
   res.sendFile(path.join(__dirname, "index.html"));
 });
@@ -75,16 +81,14 @@ app.get("/youclip", (req, res) => {
   res.sendFile(path.join(__dirname, "youclip.html"));
 });
 
-/* ===== API ===== */
+/* ===== CHAT API ===== */
 app.post("/chat", async (req, res) => {
   const userIP = ip(req);
   const { message, chatId = "main" } = req.body;
 
-  if (bannedIPs[userIP] > Date.now()) {
+  if (bannedIPs[userIP] > Date.now())
     return res.json({ reply: "🚫 Du bist gesperrt." });
-  }
 
-  /* ADMIN LOGIN */
   if (message.startsWith("/admin login")) {
     if (message.split(" ")[2] === ADMIN_PASSWORD) {
       adminIPs.add(userIP);
@@ -100,9 +104,8 @@ app.post("/chat", async (req, res) => {
     return res.json({ reply: "❌ Falsches Passwort" });
   }
 
-  if (!serverOnline && !adminIPs.has(userIP)) {
+  if (!serverOnline && !adminIPs.has(userIP))
     return res.json({ reply: "🚧 Server aktuell offline" });
-  }
 
   if (!chats[userIP]) chats[userIP] = {};
   if (!chats[userIP][chatId]) chats[userIP][chatId] = [];
@@ -129,7 +132,7 @@ app.post("/chat", async (req, res) => {
       logs,
       warnings
     });
-  } catch (e) {
+  } catch {
     res.json({ reply: "⚠️ KI Fehler" });
   }
 });
@@ -161,4 +164,3 @@ app.post("/admin/ban", (req, res) => {
 app.listen(process.env.PORT || 3000, () => {
   console.log("🚀 StriveCore AI läuft");
 });
-
