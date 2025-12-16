@@ -77,45 +77,16 @@ header{
   color:#fff;
   font-size:14px;
 }
-
-/* ADMIN BOTTOM PANEL */
-#admin{
-  position:fixed;
-  left:0;
-  right:0;
-  bottom:0;
-  background:#111;
-  border-top:1px solid #333;
-  padding:12px;
-  display:none;
-}
-#admin b{display:block;margin-bottom:6px}
-#admin button,#admin input{
-  width:100%;
-  margin:4px 0;
-  padding:8px;
-  background:#222;
-  color:#fff;
-  border:1px solid #333;
-  border-radius:8px;
-}
-#logs{
-  max-height:120px;
-  overflow:auto;
-  font-size:12px;
-  opacity:.8;
-}
 </style>
 </head>
 
 <body>
 
-<header class="top-bar">
+<header>
   <h1>StriveCore AI</h1>
-  <button class="youclip-btn" onclick="location.href='youclip.html'">
-  YouClip
-</button>
-
+  <a href="/youclip">
+    <button>YouClip</button>
+  </a>
 </header>
 
 <div id="chat"></div>
@@ -125,20 +96,8 @@ header{
   <button id="send">➤</button>
 </div>
 
-<!-- ADMIN -->
-<div id="admin">
-  <b>Admin Panel</b>
-  <div id="adminIP"></div>
-  <button onclick="server(true)">🟢 Server Online</button>
-  <button onclick="server(false)">🔴 Server Offline</button>
-  <input id="banIP" placeholder="IP bannen">
-  <input id="banH" type="number" placeholder="Stunden">
-  <button onclick="ban()">Ban</button>
-  <div id="logs"></div>
-</div>
-
 <script>
-const API="https://strivecoreai.onrender.com";
+const API="";
 let chatId="chat-"+Date.now();
 
 const chat=document.getElementById("chat");
@@ -158,44 +117,22 @@ async function send(){
   input.value="";
   add(text,"user");
 
-  const r=await fetch(API+"/chat",{
+  const r=await fetch("/chat",{
     method:"POST",
     headers:{"Content-Type":"application/json"},
     body:JSON.stringify({message:text,chatId})
   });
   const d=await r.json();
   add(d.reply,"ai");
-
-  if(d.admin){
-    admin.style.display="block";
-    adminIP.textContent="IP: "+d.ip;
-    logs.innerHTML=(d.logs||[]).slice(-5).join("<br>");
-  }
 }
 
-sendBtn=document.getElementById("send");
-sendBtn.onclick=send;
+document.getElementById("send").onclick=send;
 input.addEventListener("keydown",e=>{
   if(e.key==="Enter") send();
 });
-
-function server(on){
-  fetch(API+"/admin/"+(on?"online":"offline"),{method:"POST"});
-}
-function ban(){
-  fetch(API+"/admin/ban",{
-    method:"POST",
-    headers:{"Content-Type":"application/json"},
-    body:JSON.stringify({target:banIP.value,hours:banH.value})
-  });
-}
 
 add("Willkommen bei StriveCore AI 👋","ai");
 </script>
 
 </body>
 </html>
-
-
-
-
