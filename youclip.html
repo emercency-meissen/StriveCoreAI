@@ -3,55 +3,56 @@
 <head>
 <meta charset="UTF-8">
 <title>YouClip</title>
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<link rel="stylesheet" href="style.css">
+<style>
+body{margin:0;background:#0b0b0b;color:#fff;font-family:system-ui}
+header{padding:12px;background:#111;text-align:center}
+.video{padding:12px;border-bottom:1px solid #222}
+button{background:#222;color:#fff;border:1px solid #333}
+</style>
 </head>
-<body class="yt">
+<body>
 
-<header class="yt-header">
-  <div class="yt-left">
-    <div class="menu">☰</div>
-    <div class="logo">YouClip</div>
-  </div>
-
-  <input class="search" placeholder="Suchen">
-
-  <div class="yt-right">
-    <div class="profile">👤</div>
-  </div>
+<header>
+  <h2>YouClip</h2>
+  <button onclick="upload()">➕ Upload</button>
 </header>
 
-<main class="yt-main">
-  <aside class="yt-sidebar">
-    <div>🏠 Start</div>
-    <div>🔥 Trends</div>
-    <div>📁 Abos</div>
-  </aside>
-
-  <section id="videos" class="yt-feed"></section>
-</main>
+<div id="feed"></div>
 
 <script>
-fetch("/videos")
-  .then(r => r.json())
-  .then(videos => {
-    const feed = document.getElementById("videos");
-    videos.forEach(v => {
-      feed.innerHTML += `
-        <div class="video">
-          <video src="${v.url}" controls></video>
-          <h3>${v.title}</h3>
-          <p>${v.creator}</p>
-          <button onclick="like('${v.id}')">⚡ ${v.likes}</button>
-        </div>
+fetch("/me").then(r=>r.json()).then(u=>{
+  if(!u) location.href="/auth/google";
+});
+
+function load(){
+  fetch("/videos").then(r=>r.json()).then(vs=>{
+    feed.innerHTML="";
+    vs.forEach(v=>{
+      const d=document.createElement("div");
+      d.className="video";
+      d.innerHTML=`
+        <b>${v.title}</b><br>
+        ${v.creator}<br>
+        ⭐ ${v.likes}
+        <button onclick="like('${v.id}')">Like</button>
       `;
+      feed.appendChild(d);
     });
   });
-
-function like(id){
-  fetch("/videos/like/"+id,{method:"POST"});
 }
+function like(id){
+  fetch("/videos/like/"+id,{method:"POST"}).then(load);
+}
+function upload(){
+  const t=prompt("Video Titel");
+  if(!t)return;
+  fetch("/videos/upload",{
+    method:"POST",
+    headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({title:t})
+  }).then(load);
+}
+load();
 </script>
-
 </body>
 </html>
