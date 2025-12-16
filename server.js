@@ -3,6 +3,29 @@ import cors from "cors";
 import OpenAI from "openai";
 import path from "path";
 import { fileURLToPath } from "url";
+import fs from "fs";
+
+const videosFile = path.join(__dirname, "videos.json");
+
+function readVideos(){
+  if(!fs.existsSync(videosFile)) return [];
+  return JSON.parse(fs.readFileSync(videosFile));
+}
+function saveVideos(v){
+  fs.writeFileSync(videosFile, JSON.stringify(v,null,2));
+}
+
+app.get("/videos",(req,res)=>{
+  res.json(readVideos());
+});
+
+app.post("/videos/like/:id",(req,res)=>{
+  const vids = readVideos();
+  const v = vids.find(x=>x.id===req.params.id);
+  if(v) v.likes++;
+  saveVideos(vids);
+  res.json({ok:true});
+});
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -138,3 +161,4 @@ app.post("/admin/ban", (req, res) => {
 app.listen(process.env.PORT || 3000, () => {
   console.log("🚀 StriveCore AI läuft");
 });
+
