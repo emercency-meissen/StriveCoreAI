@@ -1,6 +1,11 @@
 import express from "express";
 import cors from "cors";
 import OpenAI from "openai";
+import path from "path";
+import { fileURLToPath } from "url";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const app = express();
 app.use(cors());
@@ -26,27 +31,35 @@ const ip = req =>
   req.socket.remoteAddress ||
   "unknown";
 
-function log(text, ip) {
-  logs.push(`${new Date().toLocaleTimeString()} | ${text} | ${ip}`);
+function log(text, ipAddr) {
+  logs.push(`${new Date().toLocaleTimeString()} | ${text} | ${ipAddr}`);
 }
 
-function scan(text, ip) {
+function scan(text, ipAddr) {
   const keys = ["suizid", "umbringen", "töten", "bombe", "anschlag"];
   if (keys.some(k => text.toLowerCase().includes(k))) {
-    warnings.push({ ip, text, time: Date.now() });
-    log("WARNING", ip);
+    warnings.push({ ip: ipAddr, text, time: Date.now() });
+    log("WARNING", ipAddr);
   }
 }
 
-/* ===== ROUTES ===== */
-app.get("/", (_, res) => res.send("StriveCore AI Backend läuft"));
+/* ===== PAGE ROUTES ===== */
+app.get("/", (req, res) => {
+  res.sendFile(path.join(__dirname, "index.html"));
+});
 
+app.get("/youclip", (req, res) => {
+  res.sendFile(path.join(__dirname, "youclip.html"));
+});
+
+/* ===== API ===== */
 app.post("/chat", async (req, res) => {
   const userIP = ip(req);
   const { message, chatId = "main" } = req.body;
 
-  if (bannedIPs[userIP] > Date.now())
+  if (bannedIPs[userIP] > Date.now()) {
     return res.json({ reply: "🚫 Du bist gesperrt." });
+  }
 
   /* ADMIN LOGIN */
   if (message.startsWith("/admin login")) {
@@ -64,8 +77,9 @@ app.post("/chat", async (req, res) => {
     return res.json({ reply: "❌ Falsches Passwort" });
   }
 
-  if (!serverOnline && !adminIPs.has(userIP))
+  if (!serverOnline && !adminIPs.has(userIP)) {
     return res.json({ reply: "🚧 Server aktuell offline" });
+  }
 
   if (!chats[userIP]) chats[userIP] = {};
   if (!chats[userIP][chatId]) chats[userIP][chatId] = [];
@@ -92,7 +106,7 @@ app.post("/chat", async (req, res) => {
       logs,
       warnings
     });
-  } catch {
+  } catch (e) {
     res.json({ reply: "⚠️ KI Fehler" });
   }
 });
@@ -120,6 +134,7 @@ app.post("/admin/ban", (req, res) => {
   res.json({ ok: true });
 });
 
-app.listen(process.env.PORT || 3000, () =>
-  console.log("🚀 StriveCore AI läuft")
-);
+/* ===== START ===== */
+app.listen(process.env.PORT || 3000, () => {
+  console.log("🚀 StriveCore AI läuft");
+});
