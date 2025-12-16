@@ -36,16 +36,6 @@
   padding: 16px;
 }
 
-.youclip-btn {
-  background: linear-gradient(135deg, #ff004f, #ff6a00);
-  border: none;
-  color: white;
-  padding: 8px 14px;
-  border-radius: 20px;
-  font-weight: bold;
-  font-size: 14px;
-}
-
 .subtitle {
   text-align: center;
   margin-top: -10px;
@@ -61,5 +51,70 @@
   background:#1f1f1f;
   color:#fff;
   font-size:13px;
+}
+
+body.yt{
+  margin:0;
+  background:#0f0f0f;
+  color:#fff;
+  font-family:system-ui;
+}
+
+.yt-header{
+  display:flex;
+  align-items:center;
+  padding:10px;
+  background:#181818;
+}
+
+.yt-left{
+  display:flex;
+  gap:10px;
+  font-weight:700;
+}
+
+.logo{
+  font-size:20px;
+}
+
+.search{
+  flex:1;
+  margin:0 20px;
+  padding:8px;
+  background:#121212;
+  border:1px solid #333;
+  color:#fff;
+  border-radius:20px;
+}
+
+.yt-main{
+  display:flex;
+}
+
+.yt-sidebar{
+  width:200px;
+  padding:10px;
+  background:#181818;
+}
+
+.yt-sidebar div{
+  padding:10px;
+  border-radius:8px;
+}
+.yt-sidebar div:hover{
+  background:#222;
+}
+
+.yt-feed{
+  flex:1;
+  padding:15px;
+  display:grid;
+  grid-template-columns:repeat(auto-fill,minmax(280px,1fr));
+  gap:16px;
+}
+
+.video video{
+  width:100%;
+  border-radius:12px;
 }
 
