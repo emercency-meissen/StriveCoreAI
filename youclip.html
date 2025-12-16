@@ -2,92 +2,55 @@
 <html lang="de">
 <head>
 <meta charset="UTF-8">
-<title>YouClip • StriveCore</title>
+<title>YouClip</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<style>
-body{
-  margin:0;
-  background:#0b0b0b;
-  color:#fff;
-  font-family:system-ui;
-}
-header{
-  padding:12px;
-  text-align:center;
-  border-bottom:1px solid #222;
-}
-header h1{margin:0}
-header small{opacity:.6}
-
-#feed{
-  padding:12px;
-}
-.video{
-  background:#111;
-  border-radius:14px;
-  margin-bottom:16px;
-  padding:10px;
-}
-video{
-  width:100%;
-  border-radius:10px;
-}
-.title{
-  margin:6px 0;
-  font-weight:600;
-}
-.actions{
-  display:flex;
-  gap:10px;
-}
-.actions button{
-  background:#222;
-  border:1px solid #333;
-  color:#fff;
-  border-radius:20px;
-  padding:6px 12px;
-}
-</style>
+<link rel="stylesheet" href="style.css">
 </head>
+<body class="yt">
 
-<body>
+<header class="yt-header">
+  <div class="yt-left">
+    <div class="menu">☰</div>
+    <div class="logo">YouClip</div>
+  </div>
 
-<header>
-  <h1>YouClip</h1>
-  <small>powered by StriveCore</small>
+  <input class="search" placeholder="Suchen">
+
+  <div class="yt-right">
+    <div class="profile">👤</div>
+  </div>
 </header>
 
-<div id="feed"></div>
+<main class="yt-main">
+  <aside class="yt-sidebar">
+    <div>🏠 Start</div>
+    <div>🔥 Trends</div>
+    <div>📁 Abos</div>
+  </aside>
+
+  <section id="videos" class="yt-feed"></section>
+</main>
 
 <script>
-const API = location.origin;
-
-async function load(){
-  const r = await fetch(API + "/videos");
-  const vids = await r.json();
-  const feed = document.getElementById("feed");
-  feed.innerHTML = "";
-
-  vids.reverse().forEach(v=>{
-    const d = document.createElement("div");
-    d.className = "video";
-    d.innerHTML = `
-      <video src="${v.file}" controls></video>
-      <div class="title">${v.title}</div>
-      <div class="actions">
-        <button onclick="like('${v.id}')">⚡ ${v.likes}</button>
-      </div>
-    `;
-    feed.appendChild(d);
+fetch("/videos")
+  .then(r => r.json())
+  .then(videos => {
+    const feed = document.getElementById("videos");
+    videos.forEach(v => {
+      feed.innerHTML += `
+        <div class="video">
+          <video src="${v.url}" controls></video>
+          <h3>${v.title}</h3>
+          <p>${v.creator}</p>
+          <button onclick="like('${v.id}')">⚡ ${v.likes}</button>
+        </div>
+      `;
+    });
   });
-}
 
-async function like(id){
-  await fetch(API + "/videos/like/"+id,{method:"POST"});
-  load();
+function like(id){
+  fetch("/videos/like/"+id,{method:"POST"});
 }
-
-load();
 </script>
 
 </body>
