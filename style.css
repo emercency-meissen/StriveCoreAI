@@ -52,3 +52,14 @@
   color: #aaa;
   font-size: 14px;
 }
+
+.youclip-btn{
+  margin-left:12px;
+  padding:6px 14px;
+  border-radius:20px;
+  border:1px solid #333;
+  background:#1f1f1f;
+  color:#fff;
+  font-size:13px;
+}
+
